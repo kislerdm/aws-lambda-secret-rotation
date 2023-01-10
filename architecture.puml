@@ -1,0 +1,29 @@
+@startuml architecture
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title "[Container] AWS Lambda to rotate Neon access credentials"
+
+footer "Dmitry Kisler <admin@dkisler.com> - %date('yyyy-MM-dd')"
+
+System_Boundary(aws, "AWS Account") {
+    Container(lambda, "Secret Rotation\nFunction", "AWS Lambda", "Go app to rotate\nNeon role's password")
+    
+    System_Boundary(sm_container, "AWS Secretsmanager") {
+        Container(sm, "Secret Version", "AWS Secretsmanager", "Current version of the Neon role's access details")
+        Container(schedule, "Rotation Scheduler", "AWS Secretsmanager", "Rotation rule's executor")
+    }
+}
+
+Container_Ext(neon, "Neon", "Neon Platform", "Project with the database, and the role")
+
+Lay_U(lambda, sm_container)
+Lay_R(schedule, sm)
+
+Rel(schedule, lambda, "Invokes the lambda", "http/json")
+Rel(lambda, sm, "Writes new secret's version", "http/json")
+Rel_R(lambda, neon, "Reset the password", "http/json")
+
+SHOW_LEGEND()
+
+@enduml
