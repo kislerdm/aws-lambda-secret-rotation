@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/aws/aws-lambda-go/lambda"
@@ -24,95 +25,115 @@ type DBClient interface {
 	// SetSecret sets the password to a user in the database.
 	SetSecret(secret interface{}) error
 
-	// TestSecret tests the database access using the secret from the stage AWSPENDING.
-	TestSecret(secret interface{}) error
+	// TryConnection tries to connect to the database.
+	TryConnection(secret interface{}) error
+
+	// GenerateSecret generates the secret and mutates the `secret` value.
+	GenerateSecret(secret interface{}) error
 }
 
 type lambdaHandler func(ctx context.Context, event SecretsmanagerTriggerPayload) error
 
-type secretsManager struct {
-	c *secretsmanager.Client
+func extractSecretObject(v *secretsmanager.GetSecretValueOutput, secret interface{}) error {
+	return json.Unmarshal(v.SecretBinary, &secret)
 }
 
-func (s secretsManager) CreateSecret(ctx context.Context, event SecretsmanagerTriggerPayload) error {
-	var (
-		v   *secretsmanager.GetSecretValueOutput
-		err error
-	)
-	v, err = s.c.GetSecretValue(
+func serialiseSecret(secret interface{}) ([]byte, error) {
+	return json.Marshal(secret)
+}
+
+// createSecret the method first checks for the existence of a secret for the passed in secretARN.
+// If one does not exist, it will generate a new secret and put it with the passed in secretARN.
+func createSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
+	v, err := cfg.SecretsmanagerClient.GetSecretValue(
 		ctx, &secretsmanager.GetSecretValueInput{
 			SecretId:     aws.String(event.SecretARN),
-			VersionId:    aws.String(event.Token),
 			VersionStage: aws.String("AWSCURRENT"),
 		},
 	)
 	if err != nil {
-		v, err = s.c.GetSecretValue(
-			ctx, &secretsmanager.GetSecretValueInput{
-				SecretId: aws.String(event.SecretARN),
-			},
-		)
-		if err != nil {
-			return err
-		}
-		err = nil
+		return err
 	}
 
-	return nil
+	if _, err := cfg.SecretsmanagerClient.GetSecretValue(
+		ctx, &secretsmanager.GetSecretValueInput{
+			SecretId:     aws.String(event.SecretARN),
+			VersionStage: aws.String("AWSPENDING"),
+			VersionId:    aws.String(event.Token),
+		},
+	); nil == err {
+		return nil
+	}
+
+	if err := extractSecretObject(v, &cfg.SecretObj); err != nil {
+		return err
+	}
+
+	if err := cfg.DBClient.GenerateSecret(cfg.SecretObj); err != nil {
+		return err
+	}
+
+	o, err := serialiseSecret(cfg.SecretObj)
+	if err != nil {
+		return err
+	}
+
+	_, err = cfg.SecretsmanagerClient.PutSecretValue(
+		ctx, &secretsmanager.PutSecretValueInput{
+			SecretId:           aws.String(event.SecretARN),
+			ClientRequestToken: aws.String(event.Token),
+			SecretBinary:       o,
+			VersionStages:      []string{"AWSPENDING"},
+		},
+	)
+	return err
 }
 
-func (s secretsManager) SetSecret(ctx context.Context, event SecretsmanagerTriggerPayload, dbHandler DBClient) error {
+// setSecret sets the AWSPENDING secret in the service that the secret belongs to.
+// For example, if the secret is a database credential,
+// this method should take the value of the AWSPENDING secret
+// and set the user's password to this value in the database.
+func setSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
+	panic("todo")
+}
+
+// testSecret the method tries to log into the database with the secrets staged with AWSPENDING.
+func testSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (s secretsManager) TestSecret(ctx context.Context, event SecretsmanagerTriggerPayload, dbHandler DBClient) error {
+// finishSecret the method finishes the secret rotation
+// by setting the secret staged AWSPENDING with the AWSCURRENT stage.
+func finishSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (s secretsManager) FinishSecret(ctx context.Context, event SecretsmanagerTriggerPayload) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func router(dbClient DBClient, sm secretsManagerClient) lambdaHandler {
+func router(cfg Config) lambdaHandler {
 	return func(ctx context.Context, event SecretsmanagerTriggerPayload) error {
 		switch s := event.Step; s {
 		case "createSecret":
-			return sm.CreateSecret(ctx, event)
+			return createSecret(ctx, event, cfg)
 		case "setSecret":
-			return sm.SetSecret(ctx, event, dbClient)
+			return setSecret(ctx, event, cfg)
 		case "testSecret":
-			return sm.TestSecret(ctx, event, dbClient)
+			return testSecret(ctx, event, cfg)
 		case "finishSecret":
-			return sm.FinishSecret(ctx, event)
+			return finishSecret(ctx, event, cfg)
 		default:
 			return errors.New("unknown step " + s)
 		}
 	}
 }
 
-// Start proxy to lambda lambdaHandler which handles inter.
-func Start(dbClient DBClient, secretsManagerClient *secretsmanager.Client) {
-	lambda.Start(router(dbClient, secretsManager{c: secretsManagerClient}))
+type Config struct {
+	SecretsmanagerClient *secretsmanager.Client
+	DBClient             DBClient
+	SecretObj            interface{}
 }
 
-type secretsManagerClient interface {
-	// CreateSecret the method first checks for the existence of a secret for the passed in secretARN.
-	// If one does not exist, it will generate a new secret and put it with the passed in secretARN.
-	CreateSecret(ctx context.Context, event SecretsmanagerTriggerPayload) error
-
-	// SetSecret sets the AWSPENDING secret in the service that the secret belongs to.
-	// For example, if the secret is a database credential,
-	// this method should take the value of the AWSPENDING secret
-	// and set the user's password to this value in the database.
-	SetSecret(ctx context.Context, event SecretsmanagerTriggerPayload, dbHandler DBClient) error
-
-	// TestSecret the method tries to log into the database with the secrets staged with AWSPENDING.
-	TestSecret(ctx context.Context, event SecretsmanagerTriggerPayload, dbHandler DBClient) error
-
-	// FinishSecret the method finishes the secret rotation
-	// by setting the secret staged AWSPENDING with the AWSCURRENT stage.
-	FinishSecret(ctx context.Context, event SecretsmanagerTriggerPayload) error
+// Start proxy to lambda lambdaHandler which handles inter.
+func Start(cfg Config) {
+	lambda.Start(router(cfg))
 }
