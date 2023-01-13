@@ -106,8 +106,40 @@ func testSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Con
 // finishSecret the method finishes the secret rotation
 // by setting the secret staged AWSPENDING with the AWSCURRENT stage.
 func finishSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
-	//TODO implement me
-	panic("implement me")
+	v, err := cfg.SecretsmanagerClient.DescribeSecret(
+		ctx, &secretsmanager.DescribeSecretInput{
+			SecretId: aws.String(event.SecretARN),
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	var currentVersion string
+
+	if vv, ok := v.ResultMetadata.Get("VersionIdsToStages").(map[string]interface{}); ok {
+		for version, stages := range vv {
+			for _, stage := range stages.([]interface{}) {
+				if "AWSCURRENT" == stage.(string) {
+					if version == event.Token {
+						return nil
+					}
+
+					currentVersion = version
+				}
+			}
+		}
+	}
+
+	_, err = cfg.SecretsmanagerClient.UpdateSecretVersionStage(
+		ctx, &secretsmanager.UpdateSecretVersionStageInput{
+			SecretId:            aws.String(event.SecretARN),
+			VersionStage:        aws.String("AWSCURRENT"),
+			MoveToVersionId:     aws.String(event.Token),
+			RemoveFromVersionId: aws.String(currentVersion),
+		},
+	)
+	return err
 }
 
 func router(cfg Config) lambdaHandler {

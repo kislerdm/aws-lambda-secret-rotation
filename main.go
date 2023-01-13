@@ -48,9 +48,6 @@ type clientDB struct {
 }
 
 func (c clientDB) SetSecret(secret interface{}) error {
-	if _, ok := secret.(Secret); !ok {
-		return errors.New("wrong secret type")
-	}
 	return nil
 }
 
