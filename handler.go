@@ -23,22 +23,22 @@ type SecretsmanagerTriggerPayload struct {
 // DBClient defines the interface to handle database communication to rotate the access credentials.
 type DBClient interface {
 	// SetSecret sets the password to a user in the database.
-	SetSecret(secret interface{}) error
+	SetSecret(ctx context.Context, secret any) error
 
-	// TryConnection tries to connect to the database.
-	TryConnection(secret interface{}) error
+	// TryConnection tries to connect to the database, and executes a dummy statement.
+	TryConnection(ctx context.Context, secret any) error
 
 	// GenerateSecret generates the secret and mutates the `secret` value.
-	GenerateSecret(secret interface{}) error
+	GenerateSecret(ctx context.Context, secret any) error
 }
 
 type lambdaHandler func(ctx context.Context, event SecretsmanagerTriggerPayload) error
 
-func extractSecretObject(v *secretsmanager.GetSecretValueOutput, secret interface{}) error {
+func extractSecretObject(v *secretsmanager.GetSecretValueOutput, secret any) error {
 	return json.Unmarshal(v.SecretBinary, &secret)
 }
 
-func serialiseSecret(secret interface{}) ([]byte, error) {
+func serialiseSecret(secret any) ([]byte, error) {
 	return json.Marshal(secret)
 }
 
@@ -69,7 +69,7 @@ func createSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg C
 		return err
 	}
 
-	if err := cfg.DBClient.GenerateSecret(cfg.SecretObj); err != nil {
+	if err := cfg.DBClient.GenerateSecret(ctx, cfg.SecretObj); err != nil {
 		return err
 	}
 
@@ -117,9 +117,9 @@ func finishSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg C
 
 	var currentVersion string
 
-	if vv, ok := v.ResultMetadata.Get("VersionIdsToStages").(map[string]interface{}); ok {
+	if vv, ok := v.ResultMetadata.Get("VersionIdsToStages").(map[string]any); ok {
 		for version, stages := range vv {
-			for _, stage := range stages.([]interface{}) {
+			for _, stage := range stages.([]any) {
 				if "AWSCURRENT" == stage.(string) {
 					if version == event.Token {
 						return nil
@@ -162,7 +162,7 @@ func router(cfg Config) lambdaHandler {
 type Config struct {
 	SecretsmanagerClient *secretsmanager.Client
 	DBClient             DBClient
-	SecretObj            interface{}
+	SecretObj            any
 }
 
 // Start proxy to lambda lambdaHandler which handles inter.
