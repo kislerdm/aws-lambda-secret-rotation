@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"unsafe"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -35,11 +36,15 @@ type DBClient interface {
 type lambdaHandler func(ctx context.Context, event SecretsmanagerTriggerPayload) error
 
 func extractSecretObject(v *secretsmanager.GetSecretValueOutput, secret any) error {
-	return json.Unmarshal(v.SecretBinary, &secret)
+	return json.Unmarshal(*(*[]byte)(unsafe.Pointer(v.SecretString)), &secret)
 }
 
-func serialiseSecret(secret any) ([]byte, error) {
-	return json.Marshal(secret)
+func serialiseSecret(secret any) (*string, error) {
+	o, err := json.Marshal(secret)
+	if err != nil {
+		return nil, err
+	}
+	return (*string)(unsafe.Pointer(&o)), nil
 }
 
 // createSecret the method first checks for the existence of a secret for the passed in secretARN.
@@ -69,11 +74,11 @@ func createSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg C
 		return err
 	}
 
-	if err := cfg.DBClient.GenerateSecret(ctx, cfg.SecretObj); err != nil {
+	if err := cfg.DBClient.GenerateSecret(ctx, &cfg.SecretObj); err != nil {
 		return err
 	}
 
-	o, err := serialiseSecret(cfg.SecretObj)
+	o, err := serialiseSecret(&cfg.SecretObj)
 	if err != nil {
 		return err
 	}
@@ -82,7 +87,7 @@ func createSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg C
 		ctx, &secretsmanager.PutSecretValueInput{
 			SecretId:           aws.String(event.SecretARN),
 			ClientRequestToken: aws.String(event.Token),
-			SecretBinary:       o,
+			SecretString:       o,
 			VersionStages:      []string{"AWSPENDING"},
 		},
 	)
@@ -159,8 +164,30 @@ func router(cfg Config) lambdaHandler {
 	}
 }
 
+// SecretsmanagerClient client to communicate with the secretsmanager.
+type SecretsmanagerClient interface {
+	GetSecretValue(
+		ctx context.Context, input *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options),
+	) (*secretsmanager.GetSecretValueOutput, error)
+
+	PutSecretValue(
+		ctx context.Context, input *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options),
+	) (*secretsmanager.PutSecretValueOutput, error)
+
+	DescribeSecret(
+		ctx context.Context, input *secretsmanager.DescribeSecretInput, optFns ...func(*secretsmanager.Options),
+	) (
+		*secretsmanager.DescribeSecretOutput, error,
+	)
+
+	UpdateSecretVersionStage(
+		ctx context.Context, input *secretsmanager.UpdateSecretVersionStageInput,
+		optFns ...func(*secretsmanager.Options),
+	) (*secretsmanager.UpdateSecretVersionStageOutput, error)
+}
+
 type Config struct {
-	SecretsmanagerClient *secretsmanager.Client
+	SecretsmanagerClient SecretsmanagerClient
 	DBClient             DBClient
 	SecretObj            any
 }

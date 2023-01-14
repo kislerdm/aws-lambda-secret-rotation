@@ -136,11 +136,12 @@ func Test_clientDB_TryConnection(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				secret: &Secret{
-					User:      "qux",
-					Host:      "dev",
-					ProjectID: "foo",
-					BranchID:  "br-bar",
-					Password:  placeholderPassword,
+					User:         "qux",
+					Host:         "dev",
+					DatabaseName: "baz",
+					ProjectID:    "foo",
+					BranchID:     "br-bar",
+					Password:     placeholderPassword,
 				},
 			},
 			wantErr: false,
