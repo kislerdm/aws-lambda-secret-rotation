@@ -17,19 +17,21 @@ func Test_extractSecretObject(t *testing.T) {
 		secret any
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name       string
+		args       args
+		wantErr    bool
+		wantSecret *SecretUser
 	}{
 		{
 			name: "happy path",
 			args: args{
 				v: &secretsmanager.GetSecretValueOutput{
-					SecretString: aws.String(`{"password":"` + placeholderPassword + `"}`),
+					SecretString: &placeholderSecretUserStr,
 				},
 				secret: &SecretUser{},
 			},
-			wantErr: false,
+			wantErr:    false,
+			wantSecret: &placeholderSecretUser,
 		},
 		{
 			name: "unhappy path",
@@ -39,7 +41,8 @@ func Test_extractSecretObject(t *testing.T) {
 				},
 				secret: &SecretUser{},
 			},
-			wantErr: true,
+			wantErr:    true,
+			wantSecret: nil,
 		},
 	}
 	for _, tt := range tests {
@@ -48,8 +51,10 @@ func Test_extractSecretObject(t *testing.T) {
 				if err := extractSecretObject(tt.args.v, tt.args.secret); (err != nil) != tt.wantErr {
 					t.Errorf("extractSecretObject() error = %v, wantErr %v", err, tt.wantErr)
 				}
-				if !tt.wantErr && tt.args.secret.(*SecretUser).Password != placeholderPassword {
-					t.Errorf("extractSecretObject() failed to deserialize password")
+				if !tt.wantErr {
+					if !reflect.DeepEqual(tt.wantSecret, tt.args.secret) {
+						t.Errorf("extractSecretObject() result does not match expectation")
+					}
 				}
 			},
 		)
@@ -159,21 +164,11 @@ func (m *mockSecretsmanagerClient) UpdateSecretVersionStage(
 }
 
 var (
-	placeholderSecretUserStr = `{
-"dbname": "foo",
-"user": "bar",
-"host": "dev",
-"project_id": "baz",
-"branch_id": "br-foo",
-"password": "` + placeholderPassword + `"}`
+	placeholderSecretUserStr = `{"user":"bar","password":"` + placeholderPassword +
+		`","host":"dev","project_id":"baz","branch_id":"br-foo","dbname":"foo"}`
 
-	placeholderSecretUserNewStr = `{
-"dbname": "foo",
-"user": "bar",
-"host": "dev",
-"project_id": "baz",
-"branch_id": "br-foo",
-"password": "` + placeholderPassword + `new"}`
+	placeholderSecretUserNewStr = `{"user":"bar","password":"` + placeholderPassword +
+		`new","host":"dev","project_id":"baz","branch_id":"br-foo","dbname":"foo"}`
 
 	placeholderSecretUser = SecretUser{
 		User:         "bar",
@@ -269,40 +264,35 @@ func Test_createSecret(t *testing.T) {
 	}
 }
 
-func Test_extractSecretObject1(t *testing.T) {
+func Test_serialiseSecret(t *testing.T) {
 	type args struct {
-		v      *secretsmanager.GetSecretValueOutput
 		secret any
 	}
 	tests := []struct {
-		name       string
-		args       args
-		wantErr    bool
-		wantSecret *SecretUser
+		name    string
+		args    args
+		want    *string
+		wantErr bool
 	}{
 		{
 			name: "happy path",
 			args: args{
-				v: &secretsmanager.GetSecretValueOutput{
-					SecretString: &placeholderSecretUserStr,
-				},
-				secret: &SecretUser{},
+				secret: placeholderSecretUser,
 			},
-			wantErr:    false,
-			wantSecret: &placeholderSecretUser,
+			want:    &placeholderSecretUserStr,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				if err := extractSecretObject(tt.args.v, tt.args.secret); (err != nil) != tt.wantErr {
-					t.Errorf("extractSecretObject() error = %v, wantErr %v", err, tt.wantErr)
+				got, err := serialiseSecret(tt.args.secret)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("serialiseSecret() error = %v, wantErr %v", err, tt.wantErr)
+					return
 				}
-
-				if !tt.wantErr {
-					if !reflect.DeepEqual(tt.wantSecret, tt.args.secret) {
-						t.Errorf("extractSecretObject() result does not match expectation")
-					}
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("serialiseSecret() got = %v, want %v", got, tt.want)
 				}
 			},
 		)
