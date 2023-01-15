@@ -27,22 +27,13 @@ func serialiseSecret(secret any) (*string, error) {
 // createSecret the method first checks for the existence of a secret for the passed in secretARN.
 // If one does not exist, it will generate a new secret and put it with the passed in secretARN.
 func createSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
-	v, err := cfg.SecretsmanagerClient.GetSecretValue(
-		ctx, &secretsmanager.GetSecretValueInput{
-			SecretId:     aws.String(event.SecretARN),
-			VersionStage: aws.String("AWSCURRENT"),
-		},
-	)
+	v, err := getSecretValue(ctx, cfg.SecretsmanagerClient, event.SecretARN, "AWSCURRENT", "")
 	if err != nil {
 		return err
 	}
 
-	if _, err := cfg.SecretsmanagerClient.GetSecretValue(
-		ctx, &secretsmanager.GetSecretValueInput{
-			SecretId:     aws.String(event.SecretARN),
-			VersionStage: aws.String("AWSPENDING"),
-			VersionId:    aws.String(event.Token),
-		},
+	if _, err := getSecretValue(
+		ctx, cfg.SecretsmanagerClient, event.SecretARN, "AWSPENDING", event.Token,
 	); nil == err {
 		return nil
 	}
@@ -71,39 +62,37 @@ func createSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg C
 	return err
 }
 
+func getSecretValue(
+	ctx context.Context, client SecretsmanagerClient, secretARN, stage, version string,
+) (*secretsmanager.GetSecretValueOutput, error) {
+	return client.GetSecretValue(
+		ctx, &secretsmanager.GetSecretValueInput{
+			SecretId:     aws.String(secretARN),
+			VersionStage: aws.String(stage),
+			VersionId:    aws.String(version),
+		},
+	)
+}
+
 // setSecret sets the AWSPENDING secret in the service that the secret belongs to.
 // For example, if the secret is a database credential,
 // this method should take the value of the AWSPENDING secret
 // and set the user's password to this value in the database.
 func setSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
-	secretPrevious, err := cfg.SecretsmanagerClient.GetSecretValue(
-		ctx, &secretsmanager.GetSecretValueInput{
-			SecretId:     aws.String(event.SecretARN),
-			VersionStage: aws.String("AWSPREVIOUS"),
-		},
-	)
+	secretPrevious, err := getSecretValue(ctx, cfg.SecretsmanagerClient, event.SecretARN, "AWSPREVIOUS", "")
 	switch err.(type) {
 	case *types.ResourceNotFoundException, nil:
 	default:
 		return err
 	}
 
-	secretCurrent, err := cfg.SecretsmanagerClient.GetSecretValue(
-		ctx, &secretsmanager.GetSecretValueInput{
-			SecretId:     aws.String(event.SecretARN),
-			VersionStage: aws.String("AWSCURRENT"),
-		},
-	)
+	secretCurrent, err := getSecretValue(ctx, cfg.SecretsmanagerClient, event.SecretARN, "AWSCURRENT", "")
 	if err != nil {
 		return err
 	}
 
-	secretPending, err := cfg.SecretsmanagerClient.GetSecretValue(
-		ctx, &secretsmanager.GetSecretValueInput{
-			SecretId:     aws.String(event.SecretARN),
-			VersionStage: aws.String("AWSPENDING"),
-			VersionId:    aws.String(event.Token),
-		},
+	secretPending, err := getSecretValue(
+		ctx, cfg.SecretsmanagerClient, event.SecretARN, "AWSPENDING", event.Token,
 	)
 	if err != nil {
 		return err
@@ -114,12 +103,8 @@ func setSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Conf
 
 // testSecret the method tries to log into the database with the secrets staged with AWSPENDING.
 func testSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
-	v, err := cfg.SecretsmanagerClient.GetSecretValue(
-		ctx, &secretsmanager.GetSecretValueInput{
-			SecretId:     aws.String(event.SecretARN),
-			VersionStage: aws.String("AWSPENDING"),
-			VersionId:    aws.String(event.Token),
-		},
+	v, err := getSecretValue(
+		ctx, cfg.SecretsmanagerClient, event.SecretARN, "AWSPENDING", event.Token,
 	)
 	if err != nil {
 		return err

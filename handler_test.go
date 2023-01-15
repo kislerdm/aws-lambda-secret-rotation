@@ -95,7 +95,7 @@ func (m *mockSecretsmanagerClient) GetSecretValue(
 		SecretString:  &m.secretAWSCurrent,
 	}
 
-	if input.VersionId == nil {
+	if input.VersionId == nil || *input.VersionId == "" {
 		return o, nil
 	}
 
