@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 )
 
 func extractSecretObject(v *secretsmanager.GetSecretValueOutput, secret any) error {
@@ -75,7 +76,40 @@ func createSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg C
 // this method should take the value of the AWSPENDING secret
 // and set the user's password to this value in the database.
 func setSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
-	panic("todo")
+	secretPrevious, err := cfg.SecretsmanagerClient.GetSecretValue(
+		ctx, &secretsmanager.GetSecretValueInput{
+			SecretId:     aws.String(event.SecretARN),
+			VersionStage: aws.String("AWSPREVIOUS"),
+		},
+	)
+	switch err.(type) {
+	case *types.ResourceNotFoundException, nil:
+	default:
+		return err
+	}
+
+	secretCurrent, err := cfg.SecretsmanagerClient.GetSecretValue(
+		ctx, &secretsmanager.GetSecretValueInput{
+			SecretId:     aws.String(event.SecretARN),
+			VersionStage: aws.String("AWSCURRENT"),
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	secretPending, err := cfg.SecretsmanagerClient.GetSecretValue(
+		ctx, &secretsmanager.GetSecretValueInput{
+			SecretId:     aws.String(event.SecretARN),
+			VersionStage: aws.String("AWSPENDING"),
+			VersionId:    aws.String(event.Token),
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	return cfg.DBClient.SetSecret(ctx, secretCurrent, secretPending, secretPrevious)
 }
 
 // testSecret the method tries to log into the database with the secrets staged with AWSPENDING.
@@ -147,7 +181,7 @@ type SecretsmanagerClient interface {
 // DBClient defines the interface to handle database communication to rotate the access credentials.
 type DBClient interface {
 	// SetSecret sets the password to a user in the database.
-	SetSecret(ctx context.Context, secret any) error
+	SetSecret(ctx context.Context, secretCurrent, secretPending, secretPrevious any) error
 
 	// TryConnection tries to connect to the database, and executes a dummy statement.
 	TryConnection(ctx context.Context, secret any) error

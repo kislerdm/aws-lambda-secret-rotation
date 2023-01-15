@@ -12,7 +12,7 @@ type clientDB struct {
 	c neon.Client
 }
 
-func (c clientDB) SetSecret(ctx context.Context, secret any) error {
+func (c clientDB) SetSecret(ctx context.Context, secretCurrent, secretPending, secretPrevious any) error {
 	return nil
 }
 
