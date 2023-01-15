@@ -11,30 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 )
 
-// SecretsmanagerTriggerPayload defines the AWS Lambda function event payload type.
-type SecretsmanagerTriggerPayload struct {
-	// The secret ARN or identifier
-	SecretARN string `json:"SecretId"`
-	// The ClientRequestToken of the secret version
-	Token string `json:"ClientRequestToken"`
-	// The rotation step (one of createSecret, setSecret, testSecret, or finishSecret)
-	Step string `json:"Step"`
-}
-
-// DBClient defines the interface to handle database communication to rotate the access credentials.
-type DBClient interface {
-	// SetSecret sets the password to a user in the database.
-	SetSecret(ctx context.Context, secret any) error
-
-	// TryConnection tries to connect to the database, and executes a dummy statement.
-	TryConnection(ctx context.Context, secret any) error
-
-	// GenerateSecret generates the secret and mutates the `secret` value.
-	GenerateSecret(ctx context.Context, secret any) error
-}
-
-type lambdaHandler func(ctx context.Context, event SecretsmanagerTriggerPayload) error
-
 func extractSecretObject(v *secretsmanager.GetSecretValueOutput, secret any) error {
 	return json.Unmarshal([]byte(*v.SecretString), secret)
 }
@@ -122,11 +98,11 @@ func finishSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg C
 
 	var currentVersion string
 
-	if vv, ok := v.ResultMetadata.Get("VersionIdsToStages").(map[string]any); ok {
+	if vv := v.VersionIdsToStages; vv != nil {
 		for version, stages := range vv {
-			for _, stage := range stages.([]any) {
-				if "AWSCURRENT" == stage.(string) {
-					if version == event.Token {
+			for _, stage := range stages {
+				if "AWSCURRENT" == stage {
+					if event.Token == version {
 						return nil
 					}
 
@@ -145,23 +121,6 @@ func finishSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg C
 		},
 	)
 	return err
-}
-
-func router(cfg Config) lambdaHandler {
-	return func(ctx context.Context, event SecretsmanagerTriggerPayload) error {
-		switch s := event.Step; s {
-		case "createSecret":
-			return createSecret(ctx, event, cfg)
-		case "setSecret":
-			return setSecret(ctx, event, cfg)
-		case "testSecret":
-			return testSecret(ctx, event, cfg)
-		case "finishSecret":
-			return finishSecret(ctx, event, cfg)
-		default:
-			return errors.New("unknown step " + s)
-		}
-	}
 }
 
 // SecretsmanagerClient client to communicate with the secretsmanager.
@@ -186,6 +145,29 @@ type SecretsmanagerClient interface {
 	) (*secretsmanager.UpdateSecretVersionStageOutput, error)
 }
 
+// DBClient defines the interface to handle database communication to rotate the access credentials.
+type DBClient interface {
+	// SetSecret sets the password to a user in the database.
+	SetSecret(ctx context.Context, secret any) error
+
+	// TryConnection tries to connect to the database, and executes a dummy statement.
+	TryConnection(ctx context.Context, secret any) error
+
+	// GenerateSecret generates the secret and mutates the `secret` value.
+	GenerateSecret(ctx context.Context, secret any) error
+}
+
+// SecretsmanagerTriggerPayload defines the AWS Lambda function event payload type.
+type SecretsmanagerTriggerPayload struct {
+	// The secret ARN or identifier
+	SecretARN string `json:"SecretId"`
+	// The ClientRequestToken of the secret version
+	Token string `json:"ClientRequestToken"`
+	// The rotation step (one of createSecret, setSecret, testSecret, or finishSecret)
+	Step string `json:"Step"`
+}
+
+// Config defines the rotation lambda's configuration.
 type Config struct {
 	SecretsmanagerClient SecretsmanagerClient
 	DBClient             DBClient
@@ -194,5 +176,20 @@ type Config struct {
 
 // Start proxy to lambda lambdaHandler which handles inter.
 func Start(cfg Config) {
-	lambda.Start(router(cfg))
+	lambda.Start(
+		func(ctx context.Context, event SecretsmanagerTriggerPayload) error {
+			switch s := event.Step; s {
+			case "createSecret":
+				return createSecret(ctx, event, cfg)
+			case "setSecret":
+				return setSecret(ctx, event, cfg)
+			case "testSecret":
+				return testSecret(ctx, event, cfg)
+			case "finishSecret":
+				return finishSecret(ctx, event, cfg)
+			default:
+				return errors.New("unknown step " + s)
+			}
+		},
+	)
 }

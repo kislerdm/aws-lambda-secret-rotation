@@ -151,16 +151,36 @@ func (m *mockSecretsmanagerClient) PutSecretValue(
 func (m *mockSecretsmanagerClient) DescribeSecret(
 	ctx context.Context, input *secretsmanager.DescribeSecretInput, optFns ...func(*secretsmanager.Options),
 ) (*secretsmanager.DescribeSecretOutput, error) {
-	//TODO implement me
-	panic("implement me")
+	if m.secretByID == nil {
+		return &secretsmanager.DescribeSecretOutput{
+			ARN: input.SecretId,
+		}, nil
+	}
+
+	versionIdsToStages := make(map[string][]string, len(m.secretByID))
+	for k, v := range m.secretByID {
+		versionIdsToStages[k] = make([]string, len(v))
+		var i uint8
+		for s := range v {
+			versionIdsToStages[k][i] = s
+			i++
+		}
+	}
+
+	return &secretsmanager.DescribeSecretOutput{
+		ARN:                input.SecretId,
+		VersionIdsToStages: versionIdsToStages,
+	}, nil
 }
 
 func (m *mockSecretsmanagerClient) UpdateSecretVersionStage(
 	ctx context.Context, input *secretsmanager.UpdateSecretVersionStageInput,
 	optFns ...func(*secretsmanager.Options),
 ) (*secretsmanager.UpdateSecretVersionStageOutput, error) {
-	//TODO implement me
-	panic("implement me")
+	m.secretAWSCurrent = m.secretByID[*input.RemoveFromVersionId]["AWSPENDING"]
+	m.secretByID[*input.RemoveFromVersionId]["AWSCURRENT"] = m.secretAWSCurrent
+	delete(m.secretByID[*input.RemoveFromVersionId], "AWSPENDING")
+	return nil, nil
 }
 
 var (
@@ -293,6 +313,30 @@ func Test_serialiseSecret(t *testing.T) {
 				}
 				if !reflect.DeepEqual(got, tt.want) {
 					t.Errorf("serialiseSecret() got = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
+
+func Test_finishSecret(t *testing.T) {
+	type args struct {
+		ctx   context.Context
+		event SecretsmanagerTriggerPayload
+		cfg   Config
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if err := finishSecret(tt.args.ctx, tt.args.event, tt.args.cfg); (err != nil) != tt.wantErr {
+					t.Errorf("finishSecret() error = %v, wantErr %v", err, tt.wantErr)
 				}
 			},
 		)
