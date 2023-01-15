@@ -167,6 +167,14 @@ var (
 "branch_id": "br-foo",
 "password": "` + placeholderPassword + `"}`
 
+	placeholderSecretUserNewStr = `{
+"dbname": "foo",
+"user": "bar",
+"host": "dev",
+"project_id": "baz",
+"branch_id": "br-foo",
+"password": "` + placeholderPassword + `new"}`
+
 	placeholderSecretUser = SecretUser{
 		User:         "bar",
 		Password:     placeholderPassword,
@@ -200,6 +208,30 @@ func Test_createSecret(t *testing.T) {
 				cfg: Config{
 					SecretsmanagerClient: &mockSecretsmanagerClient{
 						secretAWSCurrent: placeholderSecretUserStr,
+					},
+					DBClient:  clientDB{c: newMockSDKClient()},
+					SecretObj: &SecretUser{},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "happy path: new secret already in the pending stage",
+			args: args{
+				ctx: context.TODO(),
+				event: SecretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "createSecret",
+				},
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{
+						secretAWSCurrent: placeholderSecretUserStr,
+						secretByID: map[string]map[string]string{
+							"foo": {
+								"AWSPENDING": placeholderSecretUserNewStr,
+							},
+						},
 					},
 					DBClient:  clientDB{c: newMockSDKClient()},
 					SecretObj: &SecretUser{},
