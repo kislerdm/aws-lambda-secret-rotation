@@ -114,8 +114,18 @@ func setSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Conf
 
 // testSecret the method tries to log into the database with the secrets staged with AWSPENDING.
 func testSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
-	//TODO implement me
-	panic("implement me")
+	v, err := cfg.SecretsmanagerClient.GetSecretValue(
+		ctx, &secretsmanager.GetSecretValueInput{
+			SecretId:     aws.String(event.SecretARN),
+			VersionStage: aws.String("AWSPENDING"),
+			VersionId:    aws.String(event.Token),
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	return cfg.DBClient.TryConnection(ctx, v)
 }
 
 // finishSecret the method finishes the secret rotation
