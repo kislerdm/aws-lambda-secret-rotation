@@ -38,7 +38,7 @@ func Test_clientDB_GenerateSecret(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				secret: &Secret{
+				secret: &SecretUser{
 					User:      "qux",
 					ProjectID: "foo",
 					BranchID:  "br-bar",
@@ -54,7 +54,7 @@ func Test_clientDB_GenerateSecret(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				secret: Secret{
+				secret: SecretUser{
 					User:      "qux",
 					ProjectID: "foo",
 					BranchID:  "br-bar",
@@ -70,7 +70,7 @@ func Test_clientDB_GenerateSecret(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				secret: &Secret{
+				secret: &SecretUser{
 					User:      "missing",
 					ProjectID: "foo",
 					BranchID:  "br-bar",
@@ -86,7 +86,7 @@ func Test_clientDB_GenerateSecret(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				secret: &Secret{
+				secret: &SecretUser{
 					User:      "",
 					ProjectID: "foo",
 					BranchID:  "br-bar",
@@ -106,8 +106,8 @@ func Test_clientDB_GenerateSecret(t *testing.T) {
 				if (err != nil) != tt.wantErr {
 					t.Errorf("GenerateSecret() error = %v, wantErr %v", err, tt.wantErr)
 				}
-				if !tt.wantErr && tt.args.secret.(*Secret).Password == placeholderPassword {
-					t.Errorf("GenerateSecret() failed to mutate a Secret obj")
+				if !tt.wantErr && tt.args.secret.(*SecretUser).Password == placeholderPassword {
+					t.Errorf("GenerateSecret() failed to mutate a SecretUser obj")
 				}
 			},
 		)
@@ -135,7 +135,7 @@ func Test_clientDB_TryConnection(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				secret: &Secret{
+				secret: &SecretUser{
 					User:         "qux",
 					Host:         "dev",
 					DatabaseName: "baz",
@@ -153,7 +153,7 @@ func Test_clientDB_TryConnection(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				secret: &Secret{
+				secret: &SecretUser{
 					User:         "qux",
 					ProjectID:    "foo",
 					DatabaseName: "baz",
@@ -170,7 +170,7 @@ func Test_clientDB_TryConnection(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				secret: &Secret{
+				secret: &SecretUser{
 					User:         "qux",
 					ProjectID:    "foo",
 					Host:         "dev",

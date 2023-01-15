@@ -27,7 +27,7 @@ func Test_extractSecretObject(t *testing.T) {
 				v: &secretsmanager.GetSecretValueOutput{
 					SecretString: aws.String(`{"password":"` + placeholderPassword + `"}`),
 				},
-				secret: &Secret{},
+				secret: &SecretUser{},
 			},
 			wantErr: false,
 		},
@@ -37,7 +37,7 @@ func Test_extractSecretObject(t *testing.T) {
 				v: &secretsmanager.GetSecretValueOutput{
 					SecretString: aws.String(`{`),
 				},
-				secret: &Secret{},
+				secret: &SecretUser{},
 			},
 			wantErr: true,
 		},
@@ -48,7 +48,7 @@ func Test_extractSecretObject(t *testing.T) {
 				if err := extractSecretObject(tt.args.v, tt.args.secret); (err != nil) != tt.wantErr {
 					t.Errorf("extractSecretObject() error = %v, wantErr %v", err, tt.wantErr)
 				}
-				if !tt.wantErr && tt.args.secret.(*Secret).Password != placeholderPassword {
+				if !tt.wantErr && tt.args.secret.(*SecretUser).Password != placeholderPassword {
 					t.Errorf("extractSecretObject() failed to deserialize password")
 				}
 			},
@@ -62,7 +62,7 @@ type mockSecretsmanagerClient struct {
 	secretByID map[string]map[string]string
 }
 
-func (m mockSecretsmanagerClient) getSecret(stage, version string) Secret {
+func (m mockSecretsmanagerClient) getSecret(stage, version string) SecretUser {
 	stages, ok := m.secretByID[version]
 	if !ok {
 		panic("no version " + version + " found")
@@ -73,7 +73,7 @@ func (m mockSecretsmanagerClient) getSecret(stage, version string) Secret {
 		panic("no stage " + stage + " for the version " + version + " found")
 	}
 
-	var secret Secret
+	var secret SecretUser
 	if err := json.Unmarshal(*(*[]byte)(unsafe.Pointer(&s)), &secret); err != nil {
 		panic(err)
 	}
@@ -180,7 +180,7 @@ func Test_createSecret(t *testing.T) {
 				cfg: Config{
 					SecretsmanagerClient: mockSecretsmanagerClient{},
 					DBClient:             clientDB{c: newMockSDKClient()},
-					SecretObj:            &Secret{},
+					SecretObj:            &SecretUser{},
 				},
 			},
 			wantErr: false,

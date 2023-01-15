@@ -27,7 +27,7 @@ func (c clientDB) TryConnection(ctx context.Context, secret any) error {
 }
 
 func (c clientDB) GenerateSecret(ctx context.Context, secret any) error {
-	s, ok := secret.(*Secret)
+	s, ok := secret.(*SecretUser)
 	if !ok {
 		return errors.New("wrong secret type")
 	}
@@ -63,7 +63,7 @@ func (m mockDB) PingContext(ctx context.Context) error {
 }
 
 func (c clientDB) openDBConnection(secret any) (db, error) {
-	s, ok := secret.(*Secret)
+	s, ok := secret.(*SecretUser)
 	if !ok {
 		return nil, errors.New("wrong secret type")
 	}
