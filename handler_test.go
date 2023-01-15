@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"reflect"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 )
 
 func Test_extractSecretObject(t *testing.T) {
@@ -101,7 +101,9 @@ func (m *mockSecretsmanagerClient) GetSecretValue(
 
 	stages, ok := m.secretByID[*input.VersionId]
 	if !ok {
-		return nil, errors.New("no version " + *input.VersionId + " found")
+		return nil, &types.ResourceNotFoundException{
+			Message: aws.String("no version " + *input.VersionId + " found"),
+		}
 	}
 
 	stage := *input.VersionStage
@@ -111,9 +113,9 @@ func (m *mockSecretsmanagerClient) GetSecretValue(
 
 	s, ok := stages[stage]
 	if !ok {
-		return nil, errors.New(
-			"no stage " + stage + " for the version " + *input.VersionId + " found",
-		)
+		return nil, &types.ResourceNotFoundException{
+			Message: aws.String("no stage " + stage + " for the version " + *input.VersionId + " found"),
+		}
 	}
 
 	stagesK := make([]string, len(stages))
