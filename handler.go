@@ -36,7 +36,7 @@ type DBClient interface {
 type lambdaHandler func(ctx context.Context, event SecretsmanagerTriggerPayload) error
 
 func extractSecretObject(v *secretsmanager.GetSecretValueOutput, secret any) error {
-	return json.Unmarshal(*(*[]byte)(unsafe.Pointer(v.SecretString)), &secret)
+	return json.Unmarshal([]byte(*v.SecretString), secret)
 }
 
 func serialiseSecret(secret any) (*string, error) {
@@ -70,15 +70,15 @@ func createSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg C
 		return nil
 	}
 
-	if err := extractSecretObject(v, &cfg.SecretObj); err != nil {
+	if err := extractSecretObject(v, cfg.SecretObj); err != nil {
 		return err
 	}
 
-	if err := cfg.DBClient.GenerateSecret(ctx, &cfg.SecretObj); err != nil {
+	if err := cfg.DBClient.GenerateSecret(ctx, cfg.SecretObj); err != nil {
 		return err
 	}
 
-	o, err := serialiseSecret(&cfg.SecretObj)
+	o, err := serialiseSecret(cfg.SecretObj)
 	if err != nil {
 		return err
 	}
