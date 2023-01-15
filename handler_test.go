@@ -198,6 +198,14 @@ var (
 		BranchID:     "br-foo",
 		DatabaseName: "foo",
 	}
+	placeholderSecretUserNew = SecretUser{
+		User:         "bar",
+		Password:     placeholderPassword + "new",
+		Host:         "dev",
+		ProjectID:    "baz",
+		BranchID:     "br-foo",
+		DatabaseName: "foo",
+	}
 )
 
 func Test_createSecret(t *testing.T) {
@@ -330,13 +338,78 @@ func Test_finishSecret(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "happy path",
+			args: args{
+				ctx: context.TODO(),
+				event: SecretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "finishSecret",
+				},
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{
+						secretAWSCurrent: placeholderSecretUserStr,
+						secretByID: map[string]map[string]string{
+							"foo": {
+								"AWSPENDING": placeholderSecretUserNewStr,
+							},
+						},
+					},
+					DBClient:  clientDB{c: newMockSDKClient()},
+					SecretObj: &SecretUser{},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "happy path: already set",
+			args: args{
+				ctx: context.TODO(),
+				event: SecretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "finishSecret",
+				},
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{
+						secretAWSCurrent: placeholderSecretUserNewStr,
+						secretByID: map[string]map[string]string{
+							"foo": {
+								"AWSCURRENT": placeholderSecretUserNewStr,
+							},
+						},
+					},
+					DBClient:  clientDB{c: newMockSDKClient()},
+					SecretObj: &SecretUser{},
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				if err := finishSecret(tt.args.ctx, tt.args.event, tt.args.cfg); (err != nil) != tt.wantErr {
 					t.Errorf("finishSecret() error = %v, wantErr %v", err, tt.wantErr)
+				}
+
+				if !tt.wantErr {
+					if !reflect.DeepEqual(
+						getSecret(
+							tt.args.cfg.SecretsmanagerClient.(*mockSecretsmanagerClient),
+							"AWSCURRENT",
+							"foo",
+						),
+						placeholderSecretUserNew,
+					) {
+						t.Errorf("finishSecret() result does not match expectation")
+					}
+
+					if tt.args.cfg.SecretsmanagerClient.(*mockSecretsmanagerClient).secretAWSCurrent !=
+						placeholderSecretUserNewStr {
+						t.Errorf("finishSecret() result does not match expectation")
+					}
 				}
 			},
 		)
