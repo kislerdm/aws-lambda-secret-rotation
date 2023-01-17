@@ -511,3 +511,93 @@ func Test_setSecret(t *testing.T) {
 		)
 	}
 }
+
+func Test_testSecret(t *testing.T) {
+	type args struct {
+		ctx   context.Context
+		event SecretsmanagerTriggerPayload
+		cfg   Config
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "happy path",
+			args: args{
+				ctx: context.TODO(),
+				event: SecretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "testSecret",
+				},
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{
+						secretAWSCurrent: placeholderSecretUserStr,
+						secretByID: map[string]map[string]string{
+							"foo": {
+								"AWSPENDING": placeholderSecretUserNewStr,
+							},
+						},
+					},
+					DBClient:  dbClient{c: newMockSDKClient()},
+					SecretObj: &SecretUser{},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "unhappy path: no AWSPENDING found",
+			args: args{
+				ctx: context.TODO(),
+				event: SecretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "testSecret",
+				},
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{
+						secretAWSCurrent: placeholderSecretUserStr,
+					},
+					DBClient:  dbClient{c: newMockSDKClient()},
+					SecretObj: &SecretUser{},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: faulty new secret value",
+			args: args{
+				ctx: context.TODO(),
+				event: SecretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "testSecret",
+				},
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{
+						secretAWSCurrent: placeholderSecretUserStr,
+						secretByID: map[string]map[string]string{
+							"foo": {
+								"AWSPENDING": `{`,
+							},
+						},
+					},
+					DBClient:  dbClient{c: newMockSDKClient()},
+					SecretObj: &SecretUser{},
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if err := testSecret(tt.args.ctx, tt.args.event, tt.args.cfg); (err != nil) != tt.wantErr {
+					t.Errorf("testSecret() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			},
+		)
+	}
+}

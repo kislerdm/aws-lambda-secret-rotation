@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"unsafe"
 
 	"github.com/aws/aws-lambda-go/lambda"
@@ -111,7 +112,12 @@ func testSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Con
 		return err
 	}
 
-	return cfg.DBClient.TryConnection(ctx, v)
+	var secret SecretUser
+	if err := ExtractSecretObject(v, &secret); err != nil {
+		return err
+	}
+
+	return cfg.DBClient.TryConnection(ctx, &secret)
 }
 
 // finishSecret the method finishes the secret rotation
@@ -207,6 +213,14 @@ type Config struct {
 func Start(cfg Config) {
 	lambda.Start(
 		func(ctx context.Context, event SecretsmanagerTriggerPayload) error {
+			if err := validateEvent(ctx, event, cfg.SecretsmanagerClient); err != nil {
+				if errors.Is(err, os.ErrExist) {
+					return nil
+				}
+				return nil
+			}
+
+			// routes to appropriate step.
 			switch s := event.Step; s {
 			case "createSecret":
 				return createSecret(ctx, event, cfg)
@@ -221,4 +235,43 @@ func Start(cfg Config) {
 			}
 		},
 	)
+}
+
+// validateEvent checks if the secret version is staged correctly.
+func validateEvent(ctx context.Context, event SecretsmanagerTriggerPayload, client SecretsmanagerClient) error {
+	v, err := client.DescribeSecret(
+		ctx, &secretsmanager.DescribeSecretInput{
+			SecretId: aws.String(event.SecretARN),
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	if v.RotationEnabled == nil || !aws.ToBool(v.RotationEnabled) {
+		return errors.New("secret " + event.SecretARN + " is not enabled for rotation")
+	}
+
+	versions, ok := v.VersionIdsToStages[event.Token]
+	if !ok || len(versions) == 0 {
+		return errors.New("secret version " + event.Token + " has no stage for rotation of secret " + event.SecretARN)
+	}
+
+	var pendingVersionPresent bool
+	for _, version := range versions {
+		if "AWSCURRENT" == version {
+			return os.ErrExist
+		}
+		if "AWSPENDING" == version {
+			pendingVersionPresent = true
+		}
+	}
+
+	if !pendingVersionPresent {
+		return errors.New(
+			"secret version " + event.Token + " not set as AWSPENDING for rotation of secret " + event.SecretARN,
+		)
+	}
+
+	return nil
 }
