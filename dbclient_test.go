@@ -1,4 +1,4 @@
-package main
+package lambda
 
 import (
 	"context"
@@ -99,7 +99,7 @@ func Test_clientDB_GenerateSecret(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				c := clientDB{
+				c := dbClient{
 					c: tt.fields.c,
 				}
 				err := c.GenerateSecret(tt.args.ctx, tt.args.secret)
@@ -185,7 +185,7 @@ func Test_clientDB_TryConnection(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				c := clientDB{
+				c := dbClient{
 					c: tt.fields.c,
 				}
 				if err := c.TryConnection(tt.args.ctx, tt.args.secret); (err != nil) != tt.wantErr {

@@ -1,4 +1,4 @@
-package main
+package lambda
 
 import (
 	"context"
@@ -20,18 +20,18 @@ func Test_extractSecretObject(t *testing.T) {
 		name       string
 		args       args
 		wantErr    bool
-		wantSecret *SecretUser
+		wantSecret any
 	}{
 		{
 			name: "happy path",
 			args: args{
 				v: &secretsmanager.GetSecretValueOutput{
-					SecretString: &placeholderSecretUserStr,
+					SecretString: aws.String(`{"foo": "bar"}`),
 				},
-				secret: &SecretUser{},
+				secret: &map[string]string{},
 			},
 			wantErr:    false,
-			wantSecret: &placeholderSecretUser,
+			wantSecret: &map[string]string{"foo": "bar"},
 		},
 		{
 			name: "unhappy path",
@@ -39,7 +39,7 @@ func Test_extractSecretObject(t *testing.T) {
 				v: &secretsmanager.GetSecretValueOutput{
 					SecretString: aws.String(`{`),
 				},
-				secret: &SecretUser{},
+				secret: nil,
 			},
 			wantErr:    true,
 			wantSecret: nil,
@@ -48,12 +48,12 @@ func Test_extractSecretObject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				if err := extractSecretObject(tt.args.v, tt.args.secret); (err != nil) != tt.wantErr {
-					t.Errorf("extractSecretObject() error = %v, wantErr %v", err, tt.wantErr)
+				if err := ExtractSecretObject(tt.args.v, tt.args.secret); (err != nil) != tt.wantErr {
+					t.Errorf("ExtractSecretObject() error = %v, wantErr %v", err, tt.wantErr)
 				}
 				if !tt.wantErr {
 					if !reflect.DeepEqual(tt.wantSecret, tt.args.secret) {
-						t.Errorf("extractSecretObject() result does not match expectation")
+						t.Errorf("ExtractSecretObject() result does not match expectation")
 					}
 				}
 			},
@@ -239,7 +239,7 @@ func Test_createSecret(t *testing.T) {
 					SecretsmanagerClient: &mockSecretsmanagerClient{
 						secretAWSCurrent: placeholderSecretUserStr,
 					},
-					DBClient:  clientDB{c: newMockSDKClient()},
+					DBClient:  dbClient{c: newMockSDKClient()},
 					SecretObj: &SecretUser{},
 				},
 			},
@@ -263,7 +263,7 @@ func Test_createSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  clientDB{c: newMockSDKClient()},
+					DBClient:  dbClient{c: newMockSDKClient()},
 					SecretObj: &SecretUser{},
 				},
 			},
@@ -363,7 +363,7 @@ func Test_finishSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  clientDB{c: newMockSDKClient()},
+					DBClient:  dbClient{c: newMockSDKClient()},
 					SecretObj: &SecretUser{},
 				},
 			},
@@ -387,7 +387,7 @@ func Test_finishSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  clientDB{c: newMockSDKClient()},
+					DBClient:  dbClient{c: newMockSDKClient()},
 					SecretObj: &SecretUser{},
 				},
 			},
@@ -453,7 +453,7 @@ func Test_setSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  clientDB{c: newMockSDKClient()},
+					DBClient:  dbClient{c: newMockSDKClient()},
 					SecretObj: &SecretUser{},
 				},
 			},
@@ -470,7 +470,7 @@ func Test_setSecret(t *testing.T) {
 				},
 				cfg: Config{
 					SecretsmanagerClient: &mockSecretsmanagerClient{},
-					DBClient:             clientDB{c: newMockSDKClient()},
+					DBClient:             dbClient{c: newMockSDKClient()},
 					SecretObj:            &SecretUser{},
 				},
 			},
@@ -494,7 +494,7 @@ func Test_setSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  clientDB{c: newMockSDKClient()},
+					DBClient:  dbClient{c: newMockSDKClient()},
 					SecretObj: &SecretUser{},
 				},
 			},

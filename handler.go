@@ -1,4 +1,4 @@
-package main
+package lambda
 
 import (
 	"context"
@@ -12,7 +12,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 )
 
-func extractSecretObject(v *secretsmanager.GetSecretValueOutput, secret any) error {
+// ExtractSecretObject deserializes secret value to a Go object of the secret type.
+func ExtractSecretObject(v *secretsmanager.GetSecretValueOutput, secret any) error {
 	return json.Unmarshal([]byte(*v.SecretString), secret)
 }
 
@@ -38,7 +39,7 @@ func createSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg C
 		return nil
 	}
 
-	if err := extractSecretObject(v, cfg.SecretObj); err != nil {
+	if err := ExtractSecretObject(v, cfg.SecretObj); err != nil {
 		return err
 	}
 

@@ -1,4 +1,4 @@
-package main
+package lambda
 
 import (
 	"context"
@@ -8,15 +8,20 @@ import (
 	neon "github.com/kislerdm/neon-sdk-go"
 )
 
-type clientDB struct {
+// NewDBClient initiates the `DBClient` to rotate credentials for Neon user.
+func NewDBClient(client neon.Client) DBClient {
+	return &dbClient{c: client}
+}
+
+type dbClient struct {
 	c neon.Client
 }
 
-func (c clientDB) SetSecret(ctx context.Context, secretCurrent, secretPending, secretPrevious any) error {
+func (c dbClient) SetSecret(ctx context.Context, secretCurrent, secretPending, secretPrevious any) error {
 	return nil
 }
 
-func (c clientDB) TryConnection(ctx context.Context, secret any) error {
+func (c dbClient) TryConnection(ctx context.Context, secret any) error {
 	db, err := c.openDBConnection(secret)
 	if err != nil {
 		return err
@@ -26,7 +31,7 @@ func (c clientDB) TryConnection(ctx context.Context, secret any) error {
 	return db.PingContext(ctx)
 }
 
-func (c clientDB) GenerateSecret(ctx context.Context, secret any) error {
+func (c dbClient) GenerateSecret(ctx context.Context, secret any) error {
 	s, ok := secret.(*SecretUser)
 	if !ok {
 		return errors.New("wrong secret type")
@@ -62,7 +67,7 @@ func (m mockDB) PingContext(ctx context.Context) error {
 	return nil
 }
 
-func (c clientDB) openDBConnection(secret any) (db, error) {
+func (c dbClient) openDBConnection(secret any) (db, error) {
 	s, ok := secret.(*SecretUser)
 	if !ok {
 		return nil, errors.New("wrong secret type")

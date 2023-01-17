@@ -9,23 +9,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	lambda "github.com/kislerdm/neon-dbpassword-rotation-lambda"
 	neon "github.com/kislerdm/neon-sdk-go"
 )
-
-// SecretAdmin defines the secret with the db admin access details.
-type SecretAdmin struct {
-	Token string `json:"token"`
-}
-
-// SecretUser defines the secret with db user access details.
-type SecretUser struct {
-	User         string `json:"user"`
-	Password     string `json:"password"`
-	Host         string `json:"host"`
-	ProjectID    string `json:"project_id"`
-	BranchID     string `json:"branch_id"`
-	DatabaseName string `json:"dbname"`
-}
 
 func main() {
 	secretAdminARN := os.Getenv("NEON_TOKEN_SECRET_ARN")
@@ -47,8 +33,8 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	var adminSecret SecretAdmin
-	if err := extractSecretObject(v, &adminSecret); err != nil {
+	var adminSecret lambda.SecretAdmin
+	if err := lambda.ExtractSecretObject(v, &adminSecret); err != nil {
 		log.Fatalln(err)
 	}
 
@@ -57,11 +43,11 @@ func main() {
 		log.Fatalf("unable to init Neon SDK, %v", err)
 	}
 
-	var s SecretUser
-	Start(
-		Config{
+	var s lambda.SecretUser
+	lambda.Start(
+		lambda.Config{
 			SecretsmanagerClient: clientSecretsManager,
-			DBClient:             clientDB{c: clientNeon},
+			DBClient:             lambda.NewDBClient(clientNeon),
 			SecretObj:            &s,
 		},
 	)
