@@ -96,6 +96,11 @@ func (m *mockSecretsmanagerClient) GetSecretValue(
 	}
 
 	if input.VersionId == nil || *input.VersionId == "" {
+		if m.secretAWSCurrent == "" {
+			return nil, &types.ResourceNotFoundException{
+				Message: aws.String("no AWSCURRENT version found"),
+			}
+		}
 		return o, nil
 	}
 
@@ -412,6 +417,95 @@ func Test_finishSecret(t *testing.T) {
 						placeholderSecretUserNewStr {
 						t.Errorf("finishSecret() result does not match expectation")
 					}
+				}
+			},
+		)
+	}
+}
+
+func Test_setSecret(t *testing.T) {
+	type args struct {
+		ctx   context.Context
+		event SecretsmanagerTriggerPayload
+		cfg   Config
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "happy path",
+			args: args{
+				ctx: context.TODO(),
+				event: SecretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "setSecret",
+				},
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{
+						secretAWSCurrent: placeholderSecretUserStr,
+						secretByID: map[string]map[string]string{
+							"foo": {
+								"AWSCURRENT": placeholderSecretUserStr,
+								"AWSPENDING": placeholderSecretUserNewStr,
+							},
+						},
+					},
+					DBClient:  clientDB{c: newMockSDKClient()},
+					SecretObj: &SecretUser{},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "unhappy path: no AWSCURRENT version",
+			args: args{
+				ctx: context.TODO(),
+				event: SecretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "setSecret",
+				},
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{},
+					DBClient:             clientDB{c: newMockSDKClient()},
+					SecretObj:            &SecretUser{},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: no AWSPENDING version",
+			args: args{
+				ctx: context.TODO(),
+				event: SecretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "setSecret",
+				},
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{
+						secretAWSCurrent: placeholderSecretUserStr,
+						secretByID: map[string]map[string]string{
+							"foo": {
+								"AWSCURRENT": placeholderSecretUserStr,
+							},
+						},
+					},
+					DBClient:  clientDB{c: newMockSDKClient()},
+					SecretObj: &SecretUser{},
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if err := setSecret(tt.args.ctx, tt.args.event, tt.args.cfg); (err != nil) != tt.wantErr {
+					t.Errorf("setSecret() error = %v, wantErr %v", err, tt.wantErr)
 				}
 			},
 		)
