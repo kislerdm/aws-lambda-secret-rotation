@@ -3,6 +3,8 @@ package lambda
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"os"
 	"reflect"
 	"testing"
 
@@ -65,6 +67,8 @@ type mockSecretsmanagerClient struct {
 	secretAWSCurrent string
 
 	secretByID map[string]map[string]string
+
+	rotationEnabled *bool
 }
 
 func getSecret(m *mockSecretsmanagerClient, stage, version string) SecretUser {
@@ -89,6 +93,12 @@ func getSecret(m *mockSecretsmanagerClient, stage, version string) SecretUser {
 func (m *mockSecretsmanagerClient) GetSecretValue(
 	ctx context.Context, input *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options),
 ) (*secretsmanager.GetSecretValueOutput, error) {
+	if m.secretAWSCurrent == "" {
+		return nil, &types.ResourceNotFoundException{
+			Message: aws.String("no secret found"),
+		}
+	}
+
 	o := &secretsmanager.GetSecretValueOutput{
 		ARN:           input.SecretId,
 		VersionStages: []string{"AWSCURRENT"},
@@ -158,6 +168,10 @@ func (m *mockSecretsmanagerClient) PutSecretValue(
 func (m *mockSecretsmanagerClient) DescribeSecret(
 	ctx context.Context, input *secretsmanager.DescribeSecretInput, optFns ...func(*secretsmanager.Options),
 ) (*secretsmanager.DescribeSecretOutput, error) {
+	if m.secretAWSCurrent == "" {
+		return nil, errors.New("no secret found")
+	}
+
 	if m.secretByID == nil {
 		return &secretsmanager.DescribeSecretOutput{
 			ARN: input.SecretId,
@@ -177,6 +191,7 @@ func (m *mockSecretsmanagerClient) DescribeSecret(
 	return &secretsmanager.DescribeSecretOutput{
 		ARN:                input.SecretId,
 		VersionIdsToStages: versionIdsToStages,
+		RotationEnabled:    m.rotationEnabled,
 	}, nil
 }
 
@@ -596,6 +611,156 @@ func Test_testSecret(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				if err := testSecret(tt.args.ctx, tt.args.event, tt.args.cfg); (err != nil) != tt.wantErr {
 					t.Errorf("testSecret() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			},
+		)
+	}
+}
+
+func Test_validateEvent(t *testing.T) {
+	type args struct {
+		ctx    context.Context
+		event  SecretsmanagerTriggerPayload
+		client SecretsmanagerClient
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+		errType error
+	}{
+		{
+			name: "happy path",
+			args: args{
+				ctx: context.TODO(),
+				event: SecretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "createSecret",
+				},
+				client: &mockSecretsmanagerClient{
+					secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					rotationEnabled:  aws.Bool(true),
+					secretByID: map[string]map[string]string{
+						"foo": {
+							"AWSPENDING": placeholderSecretUserStr,
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "unhappy path: no secret exists",
+			args: args{
+				ctx: context.TODO(),
+				event: SecretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "createSecret",
+				},
+				client: &mockSecretsmanagerClient{},
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: rotation is not enabled",
+			args: args{
+				ctx: context.TODO(),
+				event: SecretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "bar",
+					Step:      "createSecret",
+				},
+				client: &mockSecretsmanagerClient{
+					secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					secretByID: map[string]map[string]string{
+						"foo": {
+							"AWSPENDING": placeholderSecretUserStr,
+						},
+					},
+					rotationEnabled: aws.Bool(false),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: no stages for the version",
+			args: args{
+				ctx: context.TODO(),
+				event: SecretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "bar",
+					Step:      "createSecret",
+				},
+				client: &mockSecretsmanagerClient{
+					secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					secretByID: map[string]map[string]string{
+						"foo": {
+							"AWSPENDING": placeholderSecretUserStr,
+						},
+					},
+					rotationEnabled: aws.Bool(true),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "happy path: AWSCURRENT is present",
+			args: args{
+				ctx: context.TODO(),
+				event: SecretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "createSecret",
+				},
+				client: &mockSecretsmanagerClient{
+					secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					secretByID: map[string]map[string]string{
+						"foo": {
+							"AWSCURRENT": placeholderSecretUserStr,
+						},
+					},
+					rotationEnabled: aws.Bool(true),
+				},
+			},
+			wantErr: true,
+			errType: os.ErrExist,
+		},
+		{
+			name: "unhappy path: AWSPENDING is not present",
+			args: args{
+				ctx: context.TODO(),
+				event: SecretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "createSecret",
+				},
+				client: &mockSecretsmanagerClient{
+					secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					secretByID: map[string]map[string]string{
+						"foo": {
+							"AWSPREVIOUS": placeholderSecretUserStr,
+						},
+					},
+					rotationEnabled: aws.Bool(true),
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				err := validateEvent(tt.args.ctx, tt.args.event, tt.args.client)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("validateEvent() error = %v, wantErr %v", err, tt.wantErr)
+
+					if tt.errType != nil {
+						if !errors.Is(err, tt.errType) {
+							t.Errorf("validateEvent() returned error type does not match expectation")
+						}
+					}
 				}
 			},
 		)
