@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
 	"reflect"
 	"testing"
 
@@ -253,6 +252,12 @@ func Test_createSecret(t *testing.T) {
 				cfg: Config{
 					SecretsmanagerClient: &mockSecretsmanagerClient{
 						secretAWSCurrent: placeholderSecretUserStr,
+						secretByID: map[string]map[string]string{
+							"foo": {
+								"AWSCURRENT": placeholderSecretUserStr,
+								"AWSPENDING": placeholderSecretUserNewStr,
+							},
+						},
 					},
 					DBClient:  dbClient{c: newMockSDKClient()},
 					SecretObj: &SecretUser{},
@@ -274,6 +279,7 @@ func Test_createSecret(t *testing.T) {
 						secretAWSCurrent: placeholderSecretUserStr,
 						secretByID: map[string]map[string]string{
 							"foo": {
+								"AWSCURRENT": placeholderSecretUserStr,
 								"AWSPENDING": placeholderSecretUserNewStr,
 							},
 						},
@@ -698,49 +704,6 @@ func Test_validateEvent(t *testing.T) {
 					secretByID: map[string]map[string]string{
 						"foo": {
 							"AWSPENDING": placeholderSecretUserStr,
-						},
-					},
-					rotationEnabled: aws.Bool(true),
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "happy path: AWSCURRENT is present",
-			args: args{
-				ctx: context.TODO(),
-				event: SecretsmanagerTriggerPayload{
-					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
-					Token:     "foo",
-					Step:      "createSecret",
-				},
-				client: &mockSecretsmanagerClient{
-					secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
-					secretByID: map[string]map[string]string{
-						"foo": {
-							"AWSCURRENT": placeholderSecretUserStr,
-						},
-					},
-					rotationEnabled: aws.Bool(true),
-				},
-			},
-			wantErr: true,
-			errType: os.ErrExist,
-		},
-		{
-			name: "unhappy path: AWSPENDING is not present",
-			args: args{
-				ctx: context.TODO(),
-				event: SecretsmanagerTriggerPayload{
-					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
-					Token:     "foo",
-					Step:      "createSecret",
-				},
-				client: &mockSecretsmanagerClient{
-					secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
-					secretByID: map[string]map[string]string{
-						"foo": {
-							"AWSPREVIOUS": placeholderSecretUserStr,
 						},
 					},
 					rotationEnabled: aws.Bool(true),
