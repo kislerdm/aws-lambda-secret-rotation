@@ -181,6 +181,7 @@ func setSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Conf
 // testSecret the method tries to log into the database with the secrets staged with AWSPENDING.
 func testSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
 	if cfg.Debug {
+		log.Println("[DEBUG] testSecret step")
 		log.Println("[DEBUG] Fetch AWSPENDING of the secret: " + event.SecretARN + ", version: " + event.Token)
 	}
 	v, err := getSecretValue(
@@ -196,8 +197,7 @@ func testSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Con
 	if cfg.Debug {
 		log.Println("[DEBUG] deserialize secret value")
 	}
-	var secret SecretUser
-	if err := ExtractSecretObject(v, &secret); err != nil {
+	if err := ExtractSecretObject(v, cfg.SecretObj); err != nil {
 		if cfg.Debug {
 			log.Println("[DEBUG] error: " + err.Error())
 		}
@@ -207,13 +207,14 @@ func testSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Con
 	if cfg.Debug {
 		log.Println("[DEBUG] try to connect to database")
 	}
-	return cfg.DBClient.TryConnection(ctx, &secret)
+	return cfg.DBClient.TryConnection(ctx, cfg.SecretObj)
 }
 
 // finishSecret the method finishes the secret rotation
 // by setting the secret staged AWSPENDING with the AWSCURRENT stage.
 func finishSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
 	if cfg.Debug {
+		log.Println("[DEBUG] finishSecret step")
 		log.Println("[DEBUG] Describe secret: " + event.SecretARN)
 	}
 	v, err := cfg.SecretsmanagerClient.DescribeSecret(
