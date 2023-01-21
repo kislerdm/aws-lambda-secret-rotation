@@ -230,7 +230,6 @@ func finishSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg C
 	}
 
 	currentVersion := ""
-
 	if vv := v.VersionIdsToStages; vv != nil {
 		for version, stages := range vv {
 			for _, stage := range stages {
@@ -241,9 +240,9 @@ func finishSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg C
 						}
 						return nil
 					}
+					currentVersion = version
 				}
 			}
-			currentVersion = version
 		}
 	}
 

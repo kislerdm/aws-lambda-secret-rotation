@@ -198,9 +198,10 @@ func (m *mockSecretsmanagerClient) UpdateSecretVersionStage(
 	ctx context.Context, input *secretsmanager.UpdateSecretVersionStageInput,
 	optFns ...func(*secretsmanager.Options),
 ) (*secretsmanager.UpdateSecretVersionStageOutput, error) {
-	m.secretAWSCurrent = m.secretByID[*input.RemoveFromVersionId]["AWSPENDING"]
-	m.secretByID[*input.RemoveFromVersionId]["AWSCURRENT"] = m.secretAWSCurrent
-	delete(m.secretByID[*input.RemoveFromVersionId], "AWSPENDING")
+	m.secretAWSCurrent = m.secretByID[*input.MoveToVersionId]["AWSPENDING"]
+	m.secretByID[*input.MoveToVersionId]["AWSCURRENT"] = m.secretAWSCurrent
+	delete(m.secretByID[*input.MoveToVersionId], "AWSPENDING")
+	delete(m.secretByID[*input.RemoveFromVersionId], "AWSCURRENT")
 	return nil, nil
 }
 
@@ -372,7 +373,7 @@ func Test_finishSecret(t *testing.T) {
 				ctx: context.TODO(),
 				event: SecretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
-					Token:     "foo",
+					Token:     "bar",
 					Step:      "finishSecret",
 				},
 				cfg: Config{
@@ -380,6 +381,9 @@ func Test_finishSecret(t *testing.T) {
 						secretAWSCurrent: placeholderSecretUserStr,
 						secretByID: map[string]map[string]string{
 							"foo": {
+								"AWSCURRENT": placeholderSecretUserStr,
+							},
+							"bar": {
 								"AWSPENDING": placeholderSecretUserNewStr,
 							},
 						},
@@ -396,14 +400,14 @@ func Test_finishSecret(t *testing.T) {
 				ctx: context.TODO(),
 				event: SecretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
-					Token:     "foo",
+					Token:     "bar",
 					Step:      "finishSecret",
 				},
 				cfg: Config{
 					SecretsmanagerClient: &mockSecretsmanagerClient{
 						secretAWSCurrent: placeholderSecretUserNewStr,
 						secretByID: map[string]map[string]string{
-							"foo": {
+							"bar": {
 								"AWSCURRENT": placeholderSecretUserNewStr,
 							},
 						},
@@ -427,7 +431,7 @@ func Test_finishSecret(t *testing.T) {
 						getSecret(
 							tt.args.cfg.SecretsmanagerClient.(*mockSecretsmanagerClient),
 							"AWSCURRENT",
-							"foo",
+							"bar",
 						),
 						placeholderSecretUserNew,
 					) {
