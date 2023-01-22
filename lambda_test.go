@@ -251,6 +251,7 @@ func (m mockDBClient) Test(ctx context.Context, secret any) error {
 }
 
 func (m mockDBClient) Create(ctx context.Context, secret any) error {
+	secret.(*mockObj).Password = placeholderSecretUserNewStr
 	return nil
 }
 
@@ -271,7 +272,7 @@ func Test_createSecret(t *testing.T) {
 				ctx: context.TODO(),
 				event: secretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
-					Token:     "foo",
+					Token:     "bar",
 					Step:      "createSecret",
 				},
 				cfg: Config{
@@ -280,12 +281,12 @@ func Test_createSecret(t *testing.T) {
 						secretByID: map[string]map[string]string{
 							"foo": {
 								"AWSCURRENT": placeholderSecretUserStr,
-								"AWSPENDING": placeholderSecretUserNewStr,
 							},
 						},
 					},
 					ServiceClient: mockDBClient{},
 					SecretObj:     &mockObj{},
+					Debug:         true,
 				},
 			},
 			wantErr: false,
@@ -311,6 +312,7 @@ func Test_createSecret(t *testing.T) {
 					},
 					ServiceClient: mockDBClient{},
 					SecretObj:     &mockObj{},
+					Debug:         true,
 				},
 			},
 			wantErr: false,
@@ -414,6 +416,7 @@ func Test_finishSecret(t *testing.T) {
 					},
 					ServiceClient: mockDBClient{},
 					SecretObj:     &mockObj{},
+					Debug:         true,
 				},
 			},
 			wantErr: false,
@@ -438,6 +441,7 @@ func Test_finishSecret(t *testing.T) {
 					},
 					ServiceClient: mockDBClient{},
 					SecretObj:     &mockObj{},
+					Debug:         true,
 				},
 			},
 			wantErr: false,
@@ -504,6 +508,7 @@ func Test_setSecret(t *testing.T) {
 					},
 					ServiceClient: mockDBClient{},
 					SecretObj:     &mockObj{},
+					Debug:         true,
 				},
 			},
 			wantErr: false,
@@ -521,6 +526,7 @@ func Test_setSecret(t *testing.T) {
 					SecretsmanagerClient: &mockSecretsmanagerClient{},
 					ServiceClient:        mockDBClient{},
 					SecretObj:            &mockObj{},
+					Debug:                true,
 				},
 			},
 			wantErr: true,
@@ -545,6 +551,7 @@ func Test_setSecret(t *testing.T) {
 					},
 					ServiceClient: mockDBClient{},
 					SecretObj:     &mockObj{},
+					Debug:         true,
 				},
 			},
 			wantErr: true,
@@ -592,6 +599,7 @@ func Test_testSecret(t *testing.T) {
 					},
 					ServiceClient: mockDBClient{},
 					SecretObj:     &mockObj{},
+					Debug:         true,
 				},
 			},
 			wantErr: false,
@@ -611,6 +619,7 @@ func Test_testSecret(t *testing.T) {
 					},
 					ServiceClient: mockDBClient{},
 					SecretObj:     &mockObj{},
+					Debug:         true,
 				},
 			},
 			wantErr: true,
@@ -635,6 +644,7 @@ func Test_testSecret(t *testing.T) {
 					},
 					ServiceClient: mockDBClient{},
 					SecretObj:     &mockObj{},
+					Debug:         true,
 				},
 			},
 			wantErr: true,
