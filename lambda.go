@@ -351,7 +351,7 @@ func finishSecret(ctx context.Context, event secretsmanagerTriggerPayload, cfg C
 // StrToBool converts string to bool.
 func StrToBool(s string) bool {
 	switch s = strings.ToLower(s); s {
-	case "yes", "true", "1":
+	case "y", "yes", "true", "1":
 		return true
 	default:
 		return false
