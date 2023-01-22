@@ -1,7 +1,7 @@
 # AWS Lambda to rotate Secret in AWS Secretsmanager
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/kislerdm/aws-lambda-secret-rotation)](https://goreportcard.com/report/github.com/kislerdm/aws-lambda-secret-rotation)
-[![codecov](https://codecov.io/gh/kislerdm/neon-sdk-go/branch/master/graph/badge.svg?token=F6SF7VX3G3)](https://codecov.io/gh/kislerdm/neon-sdk-go)
+[![codecov](https://codecov.io/github/kislerdm/aws-lambda-secret-rotation/branch/master/graph/badge.svg?token=LABNHF9G1V)](https://codecov.io/github/kislerdm/aws-lambda-secret-rotation)
 
 AWS Lambda function
 to [rotate](https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html) secret's version, e.g.
