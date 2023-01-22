@@ -34,7 +34,6 @@ func serialiseSecret(secret any) (*string, error) {
 // If one does not exist, it will generate a new secret and put it with the passed in secretARN.
 func createSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
 	if cfg.Debug {
-		log.Println("[DEBUG] createSecret step")
 		log.Println("[DEBUG] Fetch AWSCURRENT of the secret: " + event.SecretARN)
 	}
 	v, err := getSecretValue(ctx, cfg.SecretsmanagerClient, event.SecretARN, "AWSCURRENT", "")
@@ -128,7 +127,6 @@ func getSecretValue(
 // and set the user's password to this value in the database.
 func setSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
 	if cfg.Debug {
-		log.Println("[DEBUG] setSecret step")
 		log.Println("[DEBUG] Fetch AWSPREVIOUS of the secret: " + event.SecretARN)
 	}
 	secretPrevious, err := getSecretValue(ctx, cfg.SecretsmanagerClient, event.SecretARN, "AWSPREVIOUS", "")
@@ -182,7 +180,6 @@ func setSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Conf
 // testSecret the method tries to log into the database with the secrets staged with AWSPENDING.
 func testSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
 	if cfg.Debug {
-		log.Println("[DEBUG] testSecret step")
 		log.Println("[DEBUG] Fetch AWSPENDING of the secret: " + event.SecretARN + ", version: " + event.Token)
 	}
 	v, err := getSecretValue(
@@ -215,7 +212,6 @@ func testSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Con
 // by setting the secret staged AWSPENDING with the AWSCURRENT stage.
 func finishSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
 	if cfg.Debug {
-		log.Println("[DEBUG] finishSecret step")
 		log.Println("[DEBUG] Describe secret: " + event.SecretARN)
 	}
 	v, err := cfg.SecretsmanagerClient.DescribeSecret(
@@ -313,7 +309,7 @@ type Config struct {
 	Debug                bool
 }
 
-// Start proxy to lambda lambdaHandler which handles inter.
+// Start defines the lambda handler.
 func Start(cfg Config) {
 	lambda.Start(
 		func(ctx context.Context, event SecretsmanagerTriggerPayload) error {
