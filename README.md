@@ -7,6 +7,16 @@ AWS Lambda function
 to [rotate](https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html) secret's version, e.g.
 database access credentials, stored in [AWS Secretsmanager](https://aws.amazon.com/secrets-manager/).
 
+* [How it works](#how-it-works)
+  + [The Lambda Module](#the-lambda-module)
+    - [Plugins](#plugins)
+    - [List of Plugins](#list-of-plugins)
+    - [Plugin Codebase Structure](#plugin-codebase-structure)
+* [Contribution](#contribution)
+* [Development](#development)
+  + [Requirements](#requirements)
+  + [Commands](#commands)
+
 ## How it works
 
 <figure style="alignment: center;">
