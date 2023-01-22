@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"reflect"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
+	"github.com/aws/smithy-go"
+	smithyHttp "github.com/aws/smithy-go/transport/http"
 )
 
 func Test_extractSecretObject(t *testing.T) {
@@ -72,7 +74,8 @@ type mockObj struct {
 }
 
 type mockSecretsmanagerClient struct {
-	secretAWSCurrent string
+	secretAWSCurrent  string
+	secretAWSPrevious string
 
 	secretByID map[string]map[string]string
 
@@ -101,9 +104,39 @@ func getSecret(m *mockSecretsmanagerClient, stage, version string) mockObj {
 func (m *mockSecretsmanagerClient) GetSecretValue(
 	ctx context.Context, input *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options),
 ) (*secretsmanager.GetSecretValueOutput, error) {
+	if *input.VersionStage == "AWSPREVIOUS" {
+		if m.secretAWSPrevious == "" {
+			return nil, &smithy.OperationError{
+				ServiceID:     "SecretsManager",
+				OperationName: "GetSecretValue",
+				Err: &smithyHttp.ResponseError{
+					Response: &smithyHttp.Response{
+						Response: &http.Response{
+							StatusCode: http.StatusBadRequest,
+						},
+					},
+					Err: errors.New("no secret found"),
+				},
+			}
+		}
+		return &secretsmanager.GetSecretValueOutput{
+			ARN:          input.SecretId,
+			SecretString: &m.secretAWSPrevious,
+		}, nil
+	}
+
 	if m.secretAWSCurrent == "" {
-		return nil, &types.ResourceNotFoundException{
-			Message: aws.String("no secret found"),
+		return nil, &smithy.OperationError{
+			ServiceID:     "SecretsManager",
+			OperationName: "GetSecretValue",
+			Err: &smithyHttp.ResponseError{
+				Response: &smithyHttp.Response{
+					Response: &http.Response{
+						StatusCode: http.StatusBadRequest,
+					},
+				},
+				Err: errors.New("no secret found"),
+			},
 		}
 	}
 
@@ -115,17 +148,36 @@ func (m *mockSecretsmanagerClient) GetSecretValue(
 
 	if input.VersionId == nil || *input.VersionId == "" {
 		if m.secretAWSCurrent == "" {
-			return nil, &types.ResourceNotFoundException{
-				Message: aws.String("no AWSCURRENT version found"),
+			return nil, &smithy.OperationError{
+				ServiceID:     "SecretsManager",
+				OperationName: "GetSecretValue",
+				Err: &smithyHttp.ResponseError{
+					Response: &smithyHttp.Response{
+						Response: &http.Response{
+							StatusCode: http.StatusBadRequest,
+						},
+					},
+					Err: errors.New("no secret found"),
+				},
 			}
 		}
+
 		return o, nil
 	}
 
 	stages, ok := m.secretByID[*input.VersionId]
 	if !ok {
-		return nil, &types.ResourceNotFoundException{
-			Message: aws.String("no version " + *input.VersionId + " found"),
+		return nil, &smithy.OperationError{
+			ServiceID:     "SecretsManager",
+			OperationName: "GetSecretValue",
+			Err: &smithyHttp.ResponseError{
+				Response: &smithyHttp.Response{
+					Response: &http.Response{
+						StatusCode: http.StatusBadRequest,
+					},
+				},
+				Err: errors.New("no version " + *input.VersionId + " found"),
+			},
 		}
 	}
 
@@ -136,8 +188,17 @@ func (m *mockSecretsmanagerClient) GetSecretValue(
 
 	s, ok := stages[stage]
 	if !ok {
-		return nil, &types.ResourceNotFoundException{
-			Message: aws.String("no stage " + stage + " for the version " + *input.VersionId + " found"),
+		return nil, &smithy.OperationError{
+			ServiceID:     "SecretsManager",
+			OperationName: "GetSecretValue",
+			Err: &smithyHttp.ResponseError{
+				Response: &smithyHttp.Response{
+					Response: &http.Response{
+						StatusCode: http.StatusBadRequest,
+					},
+				},
+				Err: errors.New("no stage " + stage + " for the version " + *input.VersionId + " found"),
+			},
 		}
 	}
 
@@ -493,7 +554,7 @@ func Test_setSecret(t *testing.T) {
 				ctx: context.TODO(),
 				event: secretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
-					Token:     "foo",
+					Token:     "bar",
 					Step:      "setSecret",
 				},
 				cfg: Config{
@@ -502,6 +563,8 @@ func Test_setSecret(t *testing.T) {
 						secretByID: map[string]map[string]string{
 							"foo": {
 								"AWSCURRENT": placeholderSecretUserStr,
+							},
+							"bar": {
 								"AWSPENDING": placeholderSecretUserNewStr,
 							},
 						},
@@ -514,7 +577,36 @@ func Test_setSecret(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "unhappy path: no AWSCURRENT version",
+			name: "happy path: AWSPREVIOUS is present",
+			args: args{
+				ctx: context.TODO(),
+				event: secretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "bar",
+					Step:      "setSecret",
+				},
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{
+						secretAWSCurrent:  placeholderSecretUserStr,
+						secretAWSPrevious: placeholderSecretUserStr,
+						secretByID: map[string]map[string]string{
+							"foo": {
+								"AWSCURRENT": placeholderSecretUserStr,
+							},
+							"bar": {
+								"AWSPENDING": placeholderSecretUserNewStr,
+							},
+						},
+					},
+					ServiceClient: mockDBClient{},
+					SecretObj:     &mockObj{},
+					Debug:         true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "happy path: no AWSPREVIOUS version",
 			args: args{
 				ctx: context.TODO(),
 				event: secretsmanagerTriggerPayload{
