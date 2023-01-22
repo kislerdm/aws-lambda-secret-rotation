@@ -24,8 +24,8 @@ jobs:
       - name: ls
         id: ls
         run: |
-          PLUGINS='${{ toJSON(python3 .github/workflows/scripts/ls_plugins.py -p plugin) }}'
-          echo ::set-output name=plugins::${PLUGINS}
+          PLUGINS=$(python3 .github/workflows/scripts/ls_plugins.py -p plugin)
+          echo ::set-output name=plugins::'${PLUGINS}'
 
   test:
     runs-on: ubuntu-latest
