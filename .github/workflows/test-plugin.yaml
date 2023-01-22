@@ -23,9 +23,7 @@ jobs:
           fetch-depth: 1
       - name: ls
         id: ls
-        run: |
-          PLUGINS=$(python3 .github/workflows/scripts/ls_plugins.py -p plugin)
-          echo ::set-output name=plugins::'${PLUGINS}'
+        run: echo "plugins='$(python3 .github/workflows/scripts/ls_plugins.py -p plugin)'" >> $GITHUB_OUTPUT
 
   test:
     runs-on: ubuntu-latest
