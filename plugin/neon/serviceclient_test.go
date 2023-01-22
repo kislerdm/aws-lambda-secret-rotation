@@ -102,12 +102,12 @@ func Test_clientDB_GenerateSecret(t *testing.T) {
 				c := dbClient{
 					c: tt.fields.c,
 				}
-				err := c.GenerateSecret(tt.args.ctx, tt.args.secret)
+				err := c.Create(tt.args.ctx, tt.args.secret)
 				if (err != nil) != tt.wantErr {
-					t.Errorf("GenerateSecret() error = %v, wantErr %v", err, tt.wantErr)
+					t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
 				}
 				if !tt.wantErr && tt.args.secret.(*SecretUser).Password == placeholderPassword {
-					t.Errorf("GenerateSecret() failed to mutate a SecretUser obj")
+					t.Errorf("Create() failed to mutate a SecretUser obj")
 				}
 			},
 		)
@@ -188,8 +188,8 @@ func Test_clientDB_TryConnection(t *testing.T) {
 				c := dbClient{
 					c: tt.fields.c,
 				}
-				if err := c.TryConnection(tt.args.ctx, tt.args.secret); (err != nil) != tt.wantErr {
-					t.Errorf("TryConnection() error = %v, wantErr %v", err, tt.wantErr)
+				if err := c.Test(tt.args.ctx, tt.args.secret); (err != nil) != tt.wantErr {
+					t.Errorf("Test() error = %v, wantErr %v", err, tt.wantErr)
 				}
 			},
 		)

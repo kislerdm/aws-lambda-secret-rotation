@@ -19,11 +19,11 @@ type dbClient struct {
 	c neon.Client
 }
 
-func (c dbClient) SetSecret(ctx context.Context, secretCurrent, secretPending, secretPrevious any) error {
+func (c dbClient) Set(ctx context.Context, secretCurrent, secretPending, secretPrevious any) error {
 	return nil
 }
 
-func (c dbClient) TryConnection(ctx context.Context, secret any) error {
+func (c dbClient) Test(ctx context.Context, secret any) error {
 	db, err := c.openDBConnection(secret)
 	if err != nil {
 		return err
@@ -33,7 +33,7 @@ func (c dbClient) TryConnection(ctx context.Context, secret any) error {
 	return db.PingContext(ctx)
 }
 
-func (c dbClient) GenerateSecret(ctx context.Context, secret any) error {
+func (c dbClient) Create(ctx context.Context, secret any) error {
 	s, ok := secret.(*SecretUser)
 	if !ok {
 		return errors.New("wrong secret type")

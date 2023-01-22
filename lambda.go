@@ -17,22 +17,126 @@ import (
 	smithyHttp "github.com/aws/smithy-go/transport/http"
 )
 
-// ExtractSecretObject deserializes secret value to a Go object of the secret type.
-func ExtractSecretObject(v *secretsmanager.GetSecretValueOutput, secret any) error {
-	return json.Unmarshal([]byte(*v.SecretString), secret)
+// Config defines the rotation lambda's configuration.
+type Config struct {
+	// SecretsmanagerClient the client's instance to communicate with the secretsmanager.
+	SecretsmanagerClient SecretsmanagerClient
+
+	// ServiceClient the client's instance to communicate with the service delegated credentials storage.
+	ServiceClient ServiceClient
+
+	// SecretObj defines the interface of the secret to rotate.
+	SecretObj any
+
+	// Debug set to `true` to activate debug mode's logs.
+	Debug bool
 }
 
-func serialiseSecret(secret any) (*string, error) {
-	o, err := json.Marshal(secret)
+// secretsmanagerTriggerPayload defines the AWS Lambda function's event payload type.
+type secretsmanagerTriggerPayload struct {
+	// The secret ARN or identifier
+	SecretARN string `json:"SecretId"`
+
+	// The ClientRequestToken of the secret version
+	Token string `json:"ClientRequestToken"`
+
+	// The rotation step (one of createSecret, setSecret, testSecret, or finishSecret)
+	Step string `json:"Step"`
+}
+
+// Start defines the lambda handler.
+func Start(cfg Config) {
+	lambda.Start(
+		func(ctx context.Context, event secretsmanagerTriggerPayload) error {
+			if cfg.Debug {
+				log.Println(
+					"[DEBUG] arn: " + event.SecretARN + "; step: " + event.Step + "; token: " + event.Token + "\n",
+				)
+			}
+			if err := validateEvent(ctx, event, cfg.SecretsmanagerClient); err != nil {
+				if cfg.Debug {
+					log.Println("[DEBUG] validation error:+" + err.Error() + "\n")
+				}
+				return err
+			}
+
+			// routes to appropriate step.
+			switch s := event.Step; s {
+			case "createSecret":
+				return createSecret(ctx, event, cfg)
+			case "setSecret":
+				return setSecret(ctx, event, cfg)
+			case "testSecret":
+				return testSecret(ctx, event, cfg)
+			case "finishSecret":
+				return finishSecret(ctx, event, cfg)
+			default:
+				return errors.New("unknown step " + s)
+			}
+		},
+	)
+}
+
+// SecretsmanagerClient client to communicate with the secretsmanager.
+type SecretsmanagerClient interface {
+	GetSecretValue(
+		ctx context.Context, input *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options),
+	) (*secretsmanager.GetSecretValueOutput, error)
+
+	PutSecretValue(
+		ctx context.Context, input *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options),
+	) (*secretsmanager.PutSecretValueOutput, error)
+
+	DescribeSecret(
+		ctx context.Context, input *secretsmanager.DescribeSecretInput, optFns ...func(*secretsmanager.Options),
+	) (
+		*secretsmanager.DescribeSecretOutput, error,
+	)
+
+	UpdateSecretVersionStage(
+		ctx context.Context, input *secretsmanager.UpdateSecretVersionStageInput,
+		optFns ...func(*secretsmanager.Options),
+	) (*secretsmanager.UpdateSecretVersionStageOutput, error)
+}
+
+// ServiceClient defines the interface to communicate with the service (e.g. database) to rotate the access credentials.
+type ServiceClient interface {
+	// Create generates the secret and mutates the `secret` value.
+	Create(ctx context.Context, secret any) error
+
+	// Set sets newly generated credentials in the system delegated credentials storage.
+	Set(ctx context.Context, secretCurrent, secretPending, secretPrevious any) error
+
+	// Test tries to connect to the system delegated credentials storage using newly generated secret.
+	Test(ctx context.Context, secret any) error
+}
+
+// validateEvent checks if the secret version is staged correctly.
+func validateEvent(ctx context.Context, event secretsmanagerTriggerPayload, client SecretsmanagerClient) error {
+	v, err := client.DescribeSecret(
+		ctx, &secretsmanager.DescribeSecretInput{
+			SecretId: aws.String(event.SecretARN),
+		},
+	)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return (*string)(unsafe.Pointer(&o)), nil
+
+	if v.RotationEnabled == nil || !aws.ToBool(v.RotationEnabled) {
+		return errors.New("secret " + event.SecretARN + " is not enabled for rotation")
+	}
+
+	versions, ok := v.VersionIdsToStages[event.Token]
+	if !ok || len(versions) == 0 {
+		return errors.New("secret version " + event.Token + " has no stage for rotation of secret " + event.SecretARN)
+	}
+
+	return nil
 }
 
 // createSecret the method first checks for the existence of a secret for the passed in secretARN.
 // If one does not exist, it will generate a new secret and put it with the passed in secretARN.
-func createSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
+func createSecret(ctx context.Context, event secretsmanagerTriggerPayload, cfg Config) error {
 	if cfg.Debug {
 		log.Println("[DEBUG] Fetch AWSCURRENT of the secret: " + event.SecretARN)
 	}
@@ -74,7 +178,7 @@ func createSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg C
 	if cfg.Debug {
 		log.Println("[DEBUG] Generate new secret")
 	}
-	if err := cfg.DBClient.GenerateSecret(ctx, cfg.SecretObj); err != nil {
+	if err := cfg.ServiceClient.Create(ctx, cfg.SecretObj); err != nil {
 		return err
 	}
 
@@ -108,24 +212,11 @@ func createSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg C
 	return err
 }
 
-func getSecretValue(
-	ctx context.Context, client SecretsmanagerClient, secretARN, stage, version string,
-) (*secretsmanager.GetSecretValueOutput, error) {
-	params := &secretsmanager.GetSecretValueInput{
-		SecretId:     aws.String(secretARN),
-		VersionStage: aws.String(stage),
-	}
-	if version != "" {
-		params.VersionId = aws.String(version)
-	}
-	return client.GetSecretValue(ctx, params)
-}
-
 // setSecret sets the AWSPENDING secret in the service that the secret belongs to.
 // For example, if the secret is a database credential,
 // this method should take the value of the AWSPENDING secret
 // and set the user's password to this value in the database.
-func setSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
+func setSecret(ctx context.Context, event secretsmanagerTriggerPayload, cfg Config) error {
 	if cfg.Debug {
 		log.Println("[DEBUG] Fetch AWSPREVIOUS of the secret: " + event.SecretARN)
 	}
@@ -172,13 +263,13 @@ func setSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Conf
 	}
 
 	if cfg.Debug {
-		log.Println("[DEBUG] call cfg.ServiceClient.SetSecret()")
+		log.Println("[DEBUG] call cfg.ServiceClient.Set()")
 	}
-	return cfg.DBClient.SetSecret(ctx, secretCurrent, secretPending, secretPrevious)
+	return cfg.ServiceClient.Set(ctx, secretCurrent, secretPending, secretPrevious)
 }
 
 // testSecret the method tries to log into the database with the secrets staged with AWSPENDING.
-func testSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
+func testSecret(ctx context.Context, event secretsmanagerTriggerPayload, cfg Config) error {
 	if cfg.Debug {
 		log.Println("[DEBUG] Fetch AWSPENDING of the secret: " + event.SecretARN + ", version: " + event.Token)
 	}
@@ -205,12 +296,12 @@ func testSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Con
 	if cfg.Debug {
 		log.Println("[DEBUG] try to connect to database")
 	}
-	return cfg.DBClient.TryConnection(ctx, cfg.SecretObj)
+	return cfg.ServiceClient.Test(ctx, cfg.SecretObj)
 }
 
 // finishSecret the method finishes the secret rotation
 // by setting the secret staged AWSPENDING with the AWSCURRENT stage.
-func finishSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Config) error {
+func finishSecret(ctx context.Context, event secretsmanagerTriggerPayload, cfg Config) error {
 	if cfg.Debug {
 		log.Println("[DEBUG] Describe secret: " + event.SecretARN)
 	}
@@ -257,114 +348,6 @@ func finishSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg C
 	return err
 }
 
-// SecretsmanagerClient client to communicate with the secretsmanager.
-type SecretsmanagerClient interface {
-	GetSecretValue(
-		ctx context.Context, input *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options),
-	) (*secretsmanager.GetSecretValueOutput, error)
-
-	PutSecretValue(
-		ctx context.Context, input *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options),
-	) (*secretsmanager.PutSecretValueOutput, error)
-
-	DescribeSecret(
-		ctx context.Context, input *secretsmanager.DescribeSecretInput, optFns ...func(*secretsmanager.Options),
-	) (
-		*secretsmanager.DescribeSecretOutput, error,
-	)
-
-	UpdateSecretVersionStage(
-		ctx context.Context, input *secretsmanager.UpdateSecretVersionStageInput,
-		optFns ...func(*secretsmanager.Options),
-	) (*secretsmanager.UpdateSecretVersionStageOutput, error)
-}
-
-// ServiceClient defines the interface to communicate with the service (e.g. database) to rotate the access credentials.
-type ServiceClient interface {
-	// SetSecret sets the password to a user in the database.
-	SetSecret(ctx context.Context, secretCurrent, secretPending, secretPrevious any) error
-
-	// TryConnection tries to connect to the database, and executes a dummy statement.
-	TryConnection(ctx context.Context, secret any) error
-
-	// GenerateSecret generates the secret and mutates the `secret` value.
-	GenerateSecret(ctx context.Context, secret any) error
-}
-
-// SecretsmanagerTriggerPayload defines the AWS Lambda function event payload type.
-type SecretsmanagerTriggerPayload struct {
-	// The secret ARN or identifier
-	SecretARN string `json:"SecretId"`
-	// The ClientRequestToken of the secret version
-	Token string `json:"ClientRequestToken"`
-	// The rotation step (one of createSecret, setSecret, testSecret, or finishSecret)
-	Step string `json:"Step"`
-}
-
-// Config defines the rotation lambda's configuration.
-type Config struct {
-	SecretsmanagerClient SecretsmanagerClient
-	DBClient             ServiceClient
-	SecretObj            any
-	Debug                bool
-}
-
-// Start defines the lambda handler.
-func Start(cfg Config) {
-	lambda.Start(
-		func(ctx context.Context, event SecretsmanagerTriggerPayload) error {
-			if cfg.Debug {
-				log.Println(
-					"[DEBUG] arn: " + event.SecretARN + "; step: " + event.Step + "; token: " + event.Token + "\n",
-				)
-			}
-			if err := validateEvent(ctx, event, cfg.SecretsmanagerClient); err != nil {
-				if cfg.Debug {
-					log.Println("[DEBUG] validation error:+" + err.Error() + "\n")
-				}
-				return err
-			}
-
-			// routes to appropriate step.
-			switch s := event.Step; s {
-			case "createSecret":
-				return createSecret(ctx, event, cfg)
-			case "setSecret":
-				return setSecret(ctx, event, cfg)
-			case "testSecret":
-				return testSecret(ctx, event, cfg)
-			case "finishSecret":
-				return finishSecret(ctx, event, cfg)
-			default:
-				return errors.New("unknown step " + s)
-			}
-		},
-	)
-}
-
-// validateEvent checks if the secret version is staged correctly.
-func validateEvent(ctx context.Context, event SecretsmanagerTriggerPayload, client SecretsmanagerClient) error {
-	v, err := client.DescribeSecret(
-		ctx, &secretsmanager.DescribeSecretInput{
-			SecretId: aws.String(event.SecretARN),
-		},
-	)
-	if err != nil {
-		return err
-	}
-
-	if v.RotationEnabled == nil || !aws.ToBool(v.RotationEnabled) {
-		return errors.New("secret " + event.SecretARN + " is not enabled for rotation")
-	}
-
-	versions, ok := v.VersionIdsToStages[event.Token]
-	if !ok || len(versions) == 0 {
-		return errors.New("secret version " + event.Token + " has no stage for rotation of secret " + event.SecretARN)
-	}
-
-	return nil
-}
-
 // StrToBool converts string to bool.
 func StrToBool(s string) bool {
 	switch s = strings.ToLower(s); s {
@@ -373,4 +356,30 @@ func StrToBool(s string) bool {
 	default:
 		return false
 	}
+}
+
+// ExtractSecretObject deserializes secret value to a Go object of the secret type.
+func ExtractSecretObject(v *secretsmanager.GetSecretValueOutput, secret any) error {
+	return json.Unmarshal([]byte(*v.SecretString), secret)
+}
+
+func serialiseSecret(secret any) (*string, error) {
+	o, err := json.Marshal(secret)
+	if err != nil {
+		return nil, err
+	}
+	return (*string)(unsafe.Pointer(&o)), nil
+}
+
+func getSecretValue(
+	ctx context.Context, client SecretsmanagerClient, secretARN, stage, version string,
+) (*secretsmanager.GetSecretValueOutput, error) {
+	params := &secretsmanager.GetSecretValueInput{
+		SecretId:     aws.String(secretARN),
+		VersionStage: aws.String(stage),
+	}
+	if version != "" {
+		params.VersionId = aws.String(version)
+	}
+	return client.GetSecretValue(ctx, params)
 }

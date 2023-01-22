@@ -242,22 +242,22 @@ var (
 
 type mockDBClient struct{}
 
-func (m mockDBClient) SetSecret(ctx context.Context, secretCurrent, secretPending, secretPrevious any) error {
+func (m mockDBClient) Set(ctx context.Context, secretCurrent, secretPending, secretPrevious any) error {
 	return nil
 }
 
-func (m mockDBClient) TryConnection(ctx context.Context, secret any) error {
+func (m mockDBClient) Test(ctx context.Context, secret any) error {
 	return nil
 }
 
-func (m mockDBClient) GenerateSecret(ctx context.Context, secret any) error {
+func (m mockDBClient) Create(ctx context.Context, secret any) error {
 	return nil
 }
 
 func Test_createSecret(t *testing.T) {
 	type args struct {
 		ctx   context.Context
-		event SecretsmanagerTriggerPayload
+		event secretsmanagerTriggerPayload
 		cfg   Config
 	}
 	tests := []struct {
@@ -269,7 +269,7 @@ func Test_createSecret(t *testing.T) {
 			name: "happy path",
 			args: args{
 				ctx: context.TODO(),
-				event: SecretsmanagerTriggerPayload{
+				event: secretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
 					Token:     "foo",
 					Step:      "createSecret",
@@ -284,8 +284,8 @@ func Test_createSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  mockDBClient{},
-					SecretObj: &mockObj{},
+					ServiceClient: mockDBClient{},
+					SecretObj:     &mockObj{},
 				},
 			},
 			wantErr: false,
@@ -294,7 +294,7 @@ func Test_createSecret(t *testing.T) {
 			name: "happy path: new secret already in the pending stage",
 			args: args{
 				ctx: context.TODO(),
-				event: SecretsmanagerTriggerPayload{
+				event: secretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
 					Token:     "foo",
 					Step:      "createSecret",
@@ -309,8 +309,8 @@ func Test_createSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  mockDBClient{},
-					SecretObj: &mockObj{},
+					ServiceClient: mockDBClient{},
+					SecretObj:     &mockObj{},
 				},
 			},
 			wantErr: false,
@@ -383,7 +383,7 @@ func Test_serialiseSecret(t *testing.T) {
 func Test_finishSecret(t *testing.T) {
 	type args struct {
 		ctx   context.Context
-		event SecretsmanagerTriggerPayload
+		event secretsmanagerTriggerPayload
 		cfg   Config
 	}
 	tests := []struct {
@@ -395,7 +395,7 @@ func Test_finishSecret(t *testing.T) {
 			name: "happy path",
 			args: args{
 				ctx: context.TODO(),
-				event: SecretsmanagerTriggerPayload{
+				event: secretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
 					Token:     "bar",
 					Step:      "finishSecret",
@@ -412,8 +412,8 @@ func Test_finishSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  mockDBClient{},
-					SecretObj: &mockObj{},
+					ServiceClient: mockDBClient{},
+					SecretObj:     &mockObj{},
 				},
 			},
 			wantErr: false,
@@ -422,7 +422,7 @@ func Test_finishSecret(t *testing.T) {
 			name: "happy path: already set",
 			args: args{
 				ctx: context.TODO(),
-				event: SecretsmanagerTriggerPayload{
+				event: secretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
 					Token:     "bar",
 					Step:      "finishSecret",
@@ -436,8 +436,8 @@ func Test_finishSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  mockDBClient{},
-					SecretObj: &mockObj{},
+					ServiceClient: mockDBClient{},
+					SecretObj:     &mockObj{},
 				},
 			},
 			wantErr: false,
@@ -475,7 +475,7 @@ func Test_finishSecret(t *testing.T) {
 func Test_setSecret(t *testing.T) {
 	type args struct {
 		ctx   context.Context
-		event SecretsmanagerTriggerPayload
+		event secretsmanagerTriggerPayload
 		cfg   Config
 	}
 	tests := []struct {
@@ -487,7 +487,7 @@ func Test_setSecret(t *testing.T) {
 			name: "happy path",
 			args: args{
 				ctx: context.TODO(),
-				event: SecretsmanagerTriggerPayload{
+				event: secretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
 					Token:     "foo",
 					Step:      "setSecret",
@@ -502,8 +502,8 @@ func Test_setSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  mockDBClient{},
-					SecretObj: &mockObj{},
+					ServiceClient: mockDBClient{},
+					SecretObj:     &mockObj{},
 				},
 			},
 			wantErr: false,
@@ -512,14 +512,14 @@ func Test_setSecret(t *testing.T) {
 			name: "unhappy path: no AWSCURRENT version",
 			args: args{
 				ctx: context.TODO(),
-				event: SecretsmanagerTriggerPayload{
+				event: secretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
 					Token:     "foo",
 					Step:      "setSecret",
 				},
 				cfg: Config{
 					SecretsmanagerClient: &mockSecretsmanagerClient{},
-					DBClient:             mockDBClient{},
+					ServiceClient:        mockDBClient{},
 					SecretObj:            &mockObj{},
 				},
 			},
@@ -529,7 +529,7 @@ func Test_setSecret(t *testing.T) {
 			name: "unhappy path: no AWSPENDING version",
 			args: args{
 				ctx: context.TODO(),
-				event: SecretsmanagerTriggerPayload{
+				event: secretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
 					Token:     "foo",
 					Step:      "setSecret",
@@ -543,8 +543,8 @@ func Test_setSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  mockDBClient{},
-					SecretObj: &mockObj{},
+					ServiceClient: mockDBClient{},
+					SecretObj:     &mockObj{},
 				},
 			},
 			wantErr: true,
@@ -564,7 +564,7 @@ func Test_setSecret(t *testing.T) {
 func Test_testSecret(t *testing.T) {
 	type args struct {
 		ctx   context.Context
-		event SecretsmanagerTriggerPayload
+		event secretsmanagerTriggerPayload
 		cfg   Config
 	}
 	tests := []struct {
@@ -576,7 +576,7 @@ func Test_testSecret(t *testing.T) {
 			name: "happy path",
 			args: args{
 				ctx: context.TODO(),
-				event: SecretsmanagerTriggerPayload{
+				event: secretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
 					Token:     "foo",
 					Step:      "testSecret",
@@ -590,8 +590,8 @@ func Test_testSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  mockDBClient{},
-					SecretObj: &mockObj{},
+					ServiceClient: mockDBClient{},
+					SecretObj:     &mockObj{},
 				},
 			},
 			wantErr: false,
@@ -600,7 +600,7 @@ func Test_testSecret(t *testing.T) {
 			name: "unhappy path: no AWSPENDING found",
 			args: args{
 				ctx: context.TODO(),
-				event: SecretsmanagerTriggerPayload{
+				event: secretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
 					Token:     "foo",
 					Step:      "testSecret",
@@ -609,8 +609,8 @@ func Test_testSecret(t *testing.T) {
 					SecretsmanagerClient: &mockSecretsmanagerClient{
 						secretAWSCurrent: placeholderSecretUserStr,
 					},
-					DBClient:  mockDBClient{},
-					SecretObj: &mockObj{},
+					ServiceClient: mockDBClient{},
+					SecretObj:     &mockObj{},
 				},
 			},
 			wantErr: true,
@@ -619,7 +619,7 @@ func Test_testSecret(t *testing.T) {
 			name: "unhappy path: faulty new secret value",
 			args: args{
 				ctx: context.TODO(),
-				event: SecretsmanagerTriggerPayload{
+				event: secretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
 					Token:     "foo",
 					Step:      "testSecret",
@@ -633,8 +633,8 @@ func Test_testSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  mockDBClient{},
-					SecretObj: &mockObj{},
+					ServiceClient: mockDBClient{},
+					SecretObj:     &mockObj{},
 				},
 			},
 			wantErr: true,
@@ -654,7 +654,7 @@ func Test_testSecret(t *testing.T) {
 func Test_validateEvent(t *testing.T) {
 	type args struct {
 		ctx    context.Context
-		event  SecretsmanagerTriggerPayload
+		event  secretsmanagerTriggerPayload
 		client SecretsmanagerClient
 	}
 	tests := []struct {
@@ -667,7 +667,7 @@ func Test_validateEvent(t *testing.T) {
 			name: "happy path",
 			args: args{
 				ctx: context.TODO(),
-				event: SecretsmanagerTriggerPayload{
+				event: secretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
 					Token:     "foo",
 					Step:      "createSecret",
@@ -688,7 +688,7 @@ func Test_validateEvent(t *testing.T) {
 			name: "unhappy path: no secret exists",
 			args: args{
 				ctx: context.TODO(),
-				event: SecretsmanagerTriggerPayload{
+				event: secretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
 					Token:     "foo",
 					Step:      "createSecret",
@@ -701,7 +701,7 @@ func Test_validateEvent(t *testing.T) {
 			name: "unhappy path: rotation is not enabled",
 			args: args{
 				ctx: context.TODO(),
-				event: SecretsmanagerTriggerPayload{
+				event: secretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
 					Token:     "bar",
 					Step:      "createSecret",
@@ -722,7 +722,7 @@ func Test_validateEvent(t *testing.T) {
 			name: "unhappy path: no stages for the version",
 			args: args{
 				ctx: context.TODO(),
-				event: SecretsmanagerTriggerPayload{
+				event: secretsmanagerTriggerPayload{
 					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
 					Token:     "bar",
 					Step:      "createSecret",

@@ -47,7 +47,7 @@ func main() {
 	lambda.Start(
 		lambda.Config{
 			SecretsmanagerClient: clientSecretsManager,
-			DBClient:             dbclient.NewServiceClient(clientNeon),
+			ServiceClient:        dbclient.NewServiceClient(clientNeon),
 			SecretObj:            &s,
 			Debug:                lambda.StrToBool(os.Getenv("DEBUG")),
 		},
