@@ -9,3 +9,17 @@
 > in Rust.
 
 Find more about Neon [here](https://neon.tech/docs/introduction/about/).
+
+## Requirements
+
+Secrets (see the [types definition](models.go)):
+
+- _Secret Admin_ shall be compliant with the type `SecretAdmin`
+- _Secret User_ shall be compliant with the type `SecretUser`
+
+## AWS Lambda Configuration
+
+The environment variable `NEON_TOKEN_SECRET_ARN` must contain the _Secret Admin_'
+s [ARN](https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html).
+
+Optionally, the environment variable `DEBUG` can be set to "yes", or "true" to activate debug level logs.
