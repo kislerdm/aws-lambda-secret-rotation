@@ -11,13 +11,9 @@ database access credentials, stored in [AWS Secretsmanager](https://aws.amazon.c
 <figcaption style="alignment: center;">[C4 Container] Architecture Diagram.</figcaption>
 </figure>
 
-The diagram illustrates the logic realised in two interfaces:
+The diagram illustrates the secret's rotation.
 
-- `SecretsmanagerClient` to communicate with the secrets vault, i.e. AWS Secretsmanager;
-- `ServiceClient` to communicate with the system delegated credentials storage to the vault system. The client uses the
-  secret "_Secret Admin_" to pass authentication and authorization in order to reset the credentials "_Secret User_".
-
-Upon invocation, the AWS Lambda logic executes the
+Upon invocation, the AWS Lambda's logic executes the
 following [steps](https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotate-secrets_turn-on-for-other.html#rotate-secrets_turn-on-for-other_step5):
 
 1. _Create Secret_: new version of the "Secret User" secret is generated and stored in the staging label _AWSPENDING_;
@@ -25,10 +21,12 @@ following [steps](https://docs.aws.amazon.com/secretsmanager/latest/userguide/ro
 3. _Test Secret_: newly generated secret's version is tested against the "System deleted Access Management";
 4. _Finish Secret_: newly generated secret's version is moved from the stage _AWSPENDING_ to _AWSCURRENT_.
 
-The Lambda process undergoes authentication and authorization using the "_Secret Admin_" access credentials to perform
-the steps.
+The logic is encapsulated in two interfaces:
 
-## Plugin structure
+- `SecretsmanagerClient`: defines communication with the secrets vault, i.e. AWS Secretsmanager;
+- `ServiceClient`: defines communication with the system which credentials are stored in the vault. The interface's
+  methods define the logic to perform the rotation steps 1-3. The client uses the secret "_Secret Admin_" to pass
+  authentication and authorization in order to reset the credentials "_Secret User_".
 
 ## Contribution
 
