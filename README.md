@@ -20,8 +20,8 @@ Upon invocation, the AWS Lambda's logic executes the
 following [steps](https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotate-secrets_turn-on-for-other.html#rotate-secrets_turn-on-for-other_step5):
 
 1. _Create Secret_: new version of the "Secret User" secret is generated and stored in the staging label _AWSPENDING_;
-2. _Set Secret_: newly generated secret's version is set in the "System deleted Access Management";
-3. _Test Secret_: newly generated secret's version is tested against the "System deleted Access Management";
+2. _Set Secret_: newly generated secret's version is set in the "System delegated credentials store";
+3. _Test Secret_: newly generated secret's version is tested against the "System delegated credentials store";
 4. _Finish Secret_: newly generated secret's version is moved from the stage _AWSPENDING_ to _AWSCURRENT_.
 
 **Note** that the secret is expected to be JSON-encoded.
@@ -45,7 +45,7 @@ includes the following attributes:
 #### Plugins
 
 The lambda module defines the interfaces and abstract methods only. The implementation for specific "System delegated
-Credentials Store" is done as a plugin which defines the signatures of `ServiceClient` according to the system's specs.
+credentials store" is done as a plugin which defines the signatures of `ServiceClient` according to the system's specs.
 Every plugin is distributed as a separate Go module.
 
 #### List of Plugins
