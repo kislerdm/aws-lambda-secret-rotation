@@ -58,7 +58,7 @@ It is recommended to use the template to develop and distribute plugin's codebas
 ```commandline
 .
 |-- README.md
-|-- go.mod                <- Definition of Go module: github.com/kislerdm/password-rotation-lambda/plugin/{{.PluginName}}
+|-- go.mod                <- Definition of Go module: github.com/kislerdm/aws-lambda-secret-rotation/plugin/{{.PluginName}}
 |-- go.sum
 |-- models.go             <- Types defining structure of "Secret User" and "Secret Admin"         
 |-- serviceclient.go      <- Implementation of `ServiceClient` interface

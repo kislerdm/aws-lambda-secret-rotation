@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"errors"
 
+	lambda "github.com/kislerdm/aws-lambda-secret-rotation"
 	neon "github.com/kislerdm/neon-sdk-go"
-	lambda "github.com/kislerdm/password-rotation-lambda"
 	_ "github.com/lib/pq"
 )
 

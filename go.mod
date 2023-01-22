@@ -1,4 +1,4 @@
-module github.com/kislerdm/password-rotation-lambda
+module github.com/kislerdm/aws-lambda-secret-rotation
 
 go 1.19
 

@@ -5,12 +5,12 @@ import (
 	"log"
 	"os"
 
-	dbclient "github.com/kislerdm/password-rotation-lambda/plugin/neon"
+	dbclient "github.com/kislerdm/aws-lambda-secret-rotation/plugin/neon"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	lambda "github.com/kislerdm/aws-lambda-secret-rotation"
 	sdk "github.com/kislerdm/neon-sdk-go"
-	lambda "github.com/kislerdm/password-rotation-lambda"
 )
 
 func main() {
