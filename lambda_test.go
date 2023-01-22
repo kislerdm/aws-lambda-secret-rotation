@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -853,6 +854,88 @@ func Test_validateEvent(t *testing.T) {
 						if !errors.Is(err, tt.errType) {
 							t.Errorf("validateEvent() returned error type does not match expectation")
 						}
+					}
+				}
+			},
+		)
+	}
+}
+
+func TestStrToBool(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "positive",
+			args: args{
+				s: "yes",
+			},
+			want: true,
+		},
+		{
+			name: "positive",
+			args: args{
+				s: "y",
+			},
+			want: true,
+		},
+		{
+			name: "positive",
+			args: args{
+				s: "true",
+			},
+			want: true,
+		},
+		{
+			name: "positive",
+			args: args{
+				s: "1",
+			},
+			want: true,
+		},
+		{
+			name: "negative",
+			args: args{
+				s: "no",
+			},
+			want: false,
+		},
+		{
+			name: "negative",
+			args: args{
+				s: "n",
+			},
+			want: false,
+		},
+		{
+			name: "negative",
+			args: args{
+				s: "false",
+			},
+			want: false,
+		},
+		{
+			name: "negative",
+			args: args{
+				s: "0",
+			},
+			want: false,
+		},
+	}
+
+	t.Parallel()
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				for _, fn := range []func(string) string{strings.ToLower, strings.ToUpper} {
+					s := fn(tt.args.s)
+					if got := StrToBool(s); got != tt.want {
+						t.Errorf("StrToBool() = %v, want %v", got, tt.want)
 					}
 				}
 			},
