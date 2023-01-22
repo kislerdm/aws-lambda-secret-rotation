@@ -174,7 +174,7 @@ func setSecret(ctx context.Context, event SecretsmanagerTriggerPayload, cfg Conf
 	}
 
 	if cfg.Debug {
-		log.Println("[DEBUG] call cfg.DBClient.SetSecret()")
+		log.Println("[DEBUG] call cfg.ServiceClient.SetSecret()")
 	}
 	return cfg.DBClient.SetSecret(ctx, secretCurrent, secretPending, secretPrevious)
 }
@@ -283,8 +283,8 @@ type SecretsmanagerClient interface {
 	) (*secretsmanager.UpdateSecretVersionStageOutput, error)
 }
 
-// DBClient defines the interface to handle database communication to rotate the access credentials.
-type DBClient interface {
+// ServiceClient defines the interface to communicate with the service (e.g. database) to rotate the access credentials.
+type ServiceClient interface {
 	// SetSecret sets the password to a user in the database.
 	SetSecret(ctx context.Context, secretCurrent, secretPending, secretPrevious any) error
 
@@ -308,7 +308,7 @@ type SecretsmanagerTriggerPayload struct {
 // Config defines the rotation lambda's configuration.
 type Config struct {
 	SecretsmanagerClient SecretsmanagerClient
-	DBClient             DBClient
+	DBClient             ServiceClient
 	SecretObj            any
 	Debug                bool
 }

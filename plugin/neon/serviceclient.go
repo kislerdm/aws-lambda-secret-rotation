@@ -10,8 +10,8 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// NewDBClient initiates the `DBClient` to rotate credentials for Neon user.
-func NewDBClient(client neon.Client) lambda.DBClient {
+// NewServiceClient initiates the `ServiceClient` to rotate credentials for Neon user.
+func NewServiceClient(client neon.Client) lambda.ServiceClient {
 	return &dbClient{c: client}
 }
 
