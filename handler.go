@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 	"unsafe"
 
 	"github.com/aws/aws-lambda-go/lambda"
@@ -366,4 +367,14 @@ func validateEvent(ctx context.Context, event SecretsmanagerTriggerPayload, clie
 	}
 
 	return nil
+}
+
+// StrToBool converts string to bool.
+func StrToBool(s string) bool {
+	switch s = strings.ToLower(s); s {
+	case "yes", "true", "1":
+		return true
+	default:
+		return false
+	}
 }

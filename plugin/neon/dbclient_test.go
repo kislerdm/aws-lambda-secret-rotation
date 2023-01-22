@@ -1,4 +1,4 @@
-package lambda
+package neon
 
 import (
 	"context"

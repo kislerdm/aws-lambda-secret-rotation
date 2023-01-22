@@ -5,12 +5,12 @@ import (
 	"log"
 	"os"
 
-	_ "github.com/lib/pq"
+	dbclient "github.com/kislerdm/password-rotation-lambda/plugin/neon"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	lambda "github.com/kislerdm/neon-dbpassword-rotation-lambda"
-	neon "github.com/kislerdm/neon-sdk-go"
+	sdk "github.com/kislerdm/neon-sdk-go"
+	lambda "github.com/kislerdm/password-rotation-lambda"
 )
 
 func main() {
@@ -33,22 +33,23 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	var adminSecret lambda.SecretAdmin
+	var adminSecret dbclient.SecretAdmin
 	if err := lambda.ExtractSecretObject(v, &adminSecret); err != nil {
 		log.Fatalln(err)
 	}
 
-	clientNeon, err := neon.NewClient(neon.WithAPIKey(adminSecret.Token))
+	clientNeon, err := sdk.NewClient(sdk.WithAPIKey(adminSecret.Token))
 	if err != nil {
 		log.Fatalf("unable to init Neon SDK, %v", err)
 	}
 
-	var s lambda.SecretUser
+	var s dbclient.SecretUser
 	lambda.Start(
 		lambda.Config{
 			SecretsmanagerClient: clientSecretsManager,
-			DBClient:             lambda.NewDBClient(clientNeon),
+			DBClient:             dbclient.NewDBClient(clientNeon),
 			SecretObj:            &s,
+			Debug:                lambda.StrToBool(os.Getenv("DEBUG")),
 		},
 	)
 }

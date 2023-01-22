@@ -1,4 +1,4 @@
-package lambda
+package neon
 
 // SecretAdmin defines the secret with the db admin access details.
 type SecretAdmin struct {

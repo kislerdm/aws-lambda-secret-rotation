@@ -1,4 +1,4 @@
-package lambda
+package neon
 
 import (
 	"context"
@@ -6,10 +6,12 @@ import (
 	"errors"
 
 	neon "github.com/kislerdm/neon-sdk-go"
+	lambda "github.com/kislerdm/password-rotation-lambda"
+	_ "github.com/lib/pq"
 )
 
 // NewDBClient initiates the `DBClient` to rotate credentials for Neon user.
-func NewDBClient(client neon.Client) DBClient {
+func NewDBClient(client neon.Client) lambda.DBClient {
 	return &dbClient{c: client}
 }
 

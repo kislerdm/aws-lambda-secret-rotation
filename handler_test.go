@@ -62,6 +62,15 @@ func Test_extractSecretObject(t *testing.T) {
 	}
 }
 
+type mockObj struct {
+	User         string `json:"user"`
+	Password     string `json:"password"`
+	Host         string `json:"host"`
+	ProjectID    string `json:"project_id"`
+	BranchID     string `json:"branch_id"`
+	DatabaseName string `json:"dbname"`
+}
+
 type mockSecretsmanagerClient struct {
 	secretAWSCurrent string
 
@@ -70,7 +79,7 @@ type mockSecretsmanagerClient struct {
 	rotationEnabled *bool
 }
 
-func getSecret(m *mockSecretsmanagerClient, stage, version string) SecretUser {
+func getSecret(m *mockSecretsmanagerClient, stage, version string) mockObj {
 	stages, ok := m.secretByID[version]
 	if !ok {
 		panic("no version " + version + " found")
@@ -81,7 +90,7 @@ func getSecret(m *mockSecretsmanagerClient, stage, version string) SecretUser {
 		panic("no stage " + stage + " for the version " + version + " found")
 	}
 
-	var secret SecretUser
+	var secret mockObj
 	if err := json.Unmarshal([]byte(s), &secret); err != nil {
 		panic(err)
 	}
@@ -206,13 +215,14 @@ func (m *mockSecretsmanagerClient) UpdateSecretVersionStage(
 }
 
 var (
+	placeholderPassword      = "quxx"
 	placeholderSecretUserStr = `{"user":"bar","password":"` + placeholderPassword +
 		`","host":"dev","project_id":"baz","branch_id":"br-foo","dbname":"foo"}`
 
 	placeholderSecretUserNewStr = `{"user":"bar","password":"` + placeholderPassword +
 		`new","host":"dev","project_id":"baz","branch_id":"br-foo","dbname":"foo"}`
 
-	placeholderSecretUser = SecretUser{
+	placeholderSecretUser = mockObj{
 		User:         "bar",
 		Password:     placeholderPassword,
 		Host:         "dev",
@@ -220,7 +230,7 @@ var (
 		BranchID:     "br-foo",
 		DatabaseName: "foo",
 	}
-	placeholderSecretUserNew = SecretUser{
+	placeholderSecretUserNew = mockObj{
 		User:         "bar",
 		Password:     placeholderPassword + "new",
 		Host:         "dev",
@@ -229,6 +239,20 @@ var (
 		DatabaseName: "foo",
 	}
 )
+
+type mockDBClient struct{}
+
+func (m mockDBClient) SetSecret(ctx context.Context, secretCurrent, secretPending, secretPrevious any) error {
+	return nil
+}
+
+func (m mockDBClient) TryConnection(ctx context.Context, secret any) error {
+	return nil
+}
+
+func (m mockDBClient) GenerateSecret(ctx context.Context, secret any) error {
+	return nil
+}
 
 func Test_createSecret(t *testing.T) {
 	type args struct {
@@ -260,8 +284,8 @@ func Test_createSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  dbClient{c: newMockSDKClient()},
-					SecretObj: &SecretUser{},
+					DBClient:  mockDBClient{},
+					SecretObj: &mockObj{},
 				},
 			},
 			wantErr: false,
@@ -285,8 +309,8 @@ func Test_createSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  dbClient{c: newMockSDKClient()},
-					SecretObj: &SecretUser{},
+					DBClient:  mockDBClient{},
+					SecretObj: &mockObj{},
 				},
 			},
 			wantErr: false,
@@ -388,8 +412,8 @@ func Test_finishSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  dbClient{c: newMockSDKClient()},
-					SecretObj: &SecretUser{},
+					DBClient:  mockDBClient{},
+					SecretObj: &mockObj{},
 				},
 			},
 			wantErr: false,
@@ -412,8 +436,8 @@ func Test_finishSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  dbClient{c: newMockSDKClient()},
-					SecretObj: &SecretUser{},
+					DBClient:  mockDBClient{},
+					SecretObj: &mockObj{},
 				},
 			},
 			wantErr: false,
@@ -478,8 +502,8 @@ func Test_setSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  dbClient{c: newMockSDKClient()},
-					SecretObj: &SecretUser{},
+					DBClient:  mockDBClient{},
+					SecretObj: &mockObj{},
 				},
 			},
 			wantErr: false,
@@ -495,8 +519,8 @@ func Test_setSecret(t *testing.T) {
 				},
 				cfg: Config{
 					SecretsmanagerClient: &mockSecretsmanagerClient{},
-					DBClient:             dbClient{c: newMockSDKClient()},
-					SecretObj:            &SecretUser{},
+					DBClient:             mockDBClient{},
+					SecretObj:            &mockObj{},
 				},
 			},
 			wantErr: true,
@@ -519,8 +543,8 @@ func Test_setSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  dbClient{c: newMockSDKClient()},
-					SecretObj: &SecretUser{},
+					DBClient:  mockDBClient{},
+					SecretObj: &mockObj{},
 				},
 			},
 			wantErr: true,
@@ -566,8 +590,8 @@ func Test_testSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  dbClient{c: newMockSDKClient()},
-					SecretObj: &SecretUser{},
+					DBClient:  mockDBClient{},
+					SecretObj: &mockObj{},
 				},
 			},
 			wantErr: false,
@@ -585,8 +609,8 @@ func Test_testSecret(t *testing.T) {
 					SecretsmanagerClient: &mockSecretsmanagerClient{
 						secretAWSCurrent: placeholderSecretUserStr,
 					},
-					DBClient:  dbClient{c: newMockSDKClient()},
-					SecretObj: &SecretUser{},
+					DBClient:  mockDBClient{},
+					SecretObj: &mockObj{},
 				},
 			},
 			wantErr: true,
@@ -609,8 +633,8 @@ func Test_testSecret(t *testing.T) {
 							},
 						},
 					},
-					DBClient:  dbClient{c: newMockSDKClient()},
-					SecretObj: &SecretUser{},
+					DBClient:  mockDBClient{},
+					SecretObj: &mockObj{},
 				},
 			},
 			wantErr: true,

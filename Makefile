@@ -8,12 +8,19 @@ tests: ## Run tests.
   		go test -timeout 3m --tags=unittest -v -coverprofile=.coverage.out . -coverpkg=. && \
 		go tool cover -func .coverage.out && rm .coverage.out
 
-APP := neon-user
+APP := neon
+
+test-plugin: ## Run plugin tests.
+	@ cd plugin/$(APP) && go mod tidy && \
+  		go test -timeout 3m --tags=unittest -v -coverprofile=.coverage.out . -coverpkg=. && \
+		go tool cover -func .coverage.out && rm .coverage.out
+
 
 compile:
 	@ test -d bin || mkdir -p bin && \
+ 		cd plugin/$(APP) && \
  		go mod tidy && \
-  		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/$(APP) -ldflags="-s -w" ./cmd/$(APP)/main.go
+  		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../../bin/$(APP) -ldflags="-s -w" ./cmd/lambda/main.go
 
 build: compile ## Builds the lambda binary and archives it.z
 	@ cd bin && zip -9 $(APP).zip $(APP) && rm $(APP)
