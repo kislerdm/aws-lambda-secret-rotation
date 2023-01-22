@@ -28,7 +28,7 @@ type Config struct {
 	// SecretObj defines the interface of the secret to rotate.
 	SecretObj any
 
-	// Debug set to `true` to activate debug mode's logs.
+	// Debug set to `true` to activate debug level logs.
 	Debug bool
 }
 
