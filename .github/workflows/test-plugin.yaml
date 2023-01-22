@@ -1,0 +1,53 @@
+name: "Tests:Plugin"
+
+on:
+  push:
+    paths:
+      - "plugin/**/*.go"
+      - "plugin/**/go.mod"
+      - "plugin/**/go.sum"
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  ls_plugins:
+    runs-on: ubuntu-latest
+    name: List Plugins
+    outputs:
+      plugins: ${{ steps.ls.outputs.plugins }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+      - name: ls
+        id: ls
+        run: |
+          PLUGINS='${{ toJSON(python3 .github/workflows/scripts/ls_plugins.py -p plugin) }}'
+          echo ::set-output name=plugins::${PLUGINS}
+
+  test:
+    runs-on: ubuntu-latest
+    name: Test
+    needs:
+      - ls_plugins
+    strategy:
+      matrix:
+        plugin: ${{ fromJSON(needs.ls_plugins.outputs.plugins) }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+      - name: Change dir
+        run: cd plugin/${{ matrix.plugin }}
+      - name: Mod tidy
+        run: go mod tidy
+      - name: Test
+        run: go test -race -coverprofile=coverage.txt -covermode=atomic
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3

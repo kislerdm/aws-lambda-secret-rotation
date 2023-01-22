@@ -1,5 +1,8 @@
 # AWS Lambda to rotate Secret in AWS Secretsmanager
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/kislerdm/aws-lambda-secret-rotation)](https://goreportcard.com/report/github.com/kislerdm/aws-lambda-secret-rotation)
+[![codecov](https://codecov.io/gh/kislerdm/neon-sdk-go/branch/master/graph/badge.svg?token=F6SF7VX3G3)](https://codecov.io/gh/kislerdm/neon-sdk-go)
+
 AWS Lambda function
 to [rotate](https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html) secret's version, e.g.
 database access credentials, stored in [AWS Secretsmanager](https://aws.amazon.com/secrets-manager/).
@@ -47,7 +50,7 @@ Every plugin is distributed as a separate Go module.
 
 #### List of Plugins
 
-- [neon](plugin/neon): plugin to change user's password in the [Neon](https://neon.tech/) SaaS Postgres service
+- [neon](plugin/neon): plugin to change role's password in the [Neon](https://neon.tech/) SaaS Postgres service
 
 #### Plugin Codebase Structure
 
