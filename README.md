@@ -23,7 +23,9 @@ following [steps](https://docs.aws.amazon.com/secretsmanager/latest/userguide/ro
 
 **Note** that the secret is expected to be JSON-encoded.
 
-The logic is encapsulated in two interfaces:
+### The Lambda Module
+
+The AWS Lambda's logic defined in the Go module is encapsulated in two interfaces:
 
 - `SecretsmanagerClient`: defines communication with the secrets vault, i.e. AWS Secretsmanager;
 - `ServiceClient`: defines communication with the system which credentials are stored in the vault. The interface's
@@ -31,10 +33,40 @@ The logic is encapsulated in two interfaces:
   authentication and authorization in order to reset the credentials "_Secret User_".
 
 The AWS Lambda handler is defined as the function `Start` configured with the object of the type `Config`. The config
-includes the following attributes: 
+includes the following attributes:
+
 - Clients, i.e. instances of `SecretsmanagerClient` and `ServiceClient`;
 - `SecretObj`: the type defining the structure of the secret "Secret User";
 - `Debug`: flag to activate debug level logs.
+
+#### Plugins
+
+The lambda module defines the interfaces and abstract methods only. The implementation for specific "System delegated
+Credentials Store" is done as a plugin which defines the signatures of `ServiceClient` according to the system's specs.
+Every plugin is distributed as a separate Go module.
+
+#### List of Plugins
+
+- [neon](plugin/neon): plugin to change user's password in the [Neon](https://neon.tech/) SaaS Postgres service
+
+#### Plugin Codebase Structure
+
+Every plugin is stored in the directory [`plugin`](plugin).
+
+It is recommended to use the template to develop and distribute plugin's codebase:
+
+```commandline
+.
+|-- README.md
+|-- go.mod                <- Definition of Go module: github.com/kislerdm/password-rotation-lambda/plugin/{{.PluginName}}
+|-- go.sum
+|-- models.go             <- Types defining structure of "Secret User" and "Secret Admin"         
+|-- serviceclient.go      <- Implementation of `ServiceClient` interface
+|-- serviceclient_test.go
+`-- cmd
+    `-- lambda
+        `-- main.go       <- AWS Lambda handler's definition
+```
 
 ## Contribution
 
