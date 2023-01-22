@@ -2,7 +2,7 @@
 
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
-title "[Container] AWS Lambda to rotate Secrets stored in AWS Secretsmanager"
+title "[Containers] AWS Lambda to rotate Access Credentials\nstored in AWS Secretsmanager"
 
 footer "Dmitry Kisler <admin@dkisler.com> - %date('yyyy-MM-dd')"
 
@@ -20,16 +20,16 @@ System_Boundary(aws, "AWS Account") {
     }
 }
 
-Container_Ext(service, "System delegated Access Management", "SaaS", "System to access\nusing <b>Secret User</b>")
+Container_Ext(service, "System delegated credentials store", "SaaS")
 
 Lay_U(lambda, sm_container)
 Lay_L(lambda, sm_container_admin)
 Lay_R(schedule, sm)
 
 Rel(schedule, lambda, "Invokes the lambda", "HTTP/JSON")
-Rel(lambda, sm, "Writes new secret's version", "HTTP/JSON")
+Rel(lambda, sm, "Generates and sets new secret's version", "HTTP/JSON")
 Rel(lambda, sm_admin, "Reads admin access credentials", "HTTP/JSON")
-Rel_R(lambda, service, "Resets the password", "TCP")
+Rel_R(lambda, service, "Sets new credentials", "TCP")
 
 SHOW_LEGEND()
 

@@ -50,7 +50,7 @@ Every plugin is distributed as a separate Go module.
 
 #### List of Plugins
 
-- [neon](plugin/neon): plugin to change role's password in the [Neon](https://neon.tech/) SaaS Postgres service
+- [neon](plugin/neon): plugin to change user's password in the [Neon](https://neon.tech/) SaaS Postgres service
 
 #### Plugin Codebase Structure
 

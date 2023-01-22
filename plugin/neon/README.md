@@ -1,4 +1,4 @@
-# Plugin for AWS Lambda to reset Neon Role's Password
+# Plugin for AWS Lambda to reset Neon User's Password
 
 [![logo](https://neon.tech/static/logo-white-9b5ae00331360361ba068980af7383ba.svg)](https://neon.tech)
 
