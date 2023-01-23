@@ -1,7 +1,7 @@
 .idea
 .DS_Store
 .env
-terraform
-tf
-bin
+**/.terraform*
+**/*terraform.tfstate*
+**/terraform
 .coverage.out
