@@ -76,6 +76,10 @@ It is recommended to use the template to develop and distribute plugin's codebas
 |-- models.go             <- Types defining structure of "Secret User" and "Secret Admin"         
 |-- serviceclient.go      <- Implementation of `ServiceClient` interface
 |-- serviceclient_test.go
+|-- .release_notes        <- release notes following https://keepachangelog.com/en/1.0.0/
+|   |-- v0.0.1.md
+|   |-- ...   
+|   `-- vx.y.z.md
 `-- cmd
     `-- lambda
         `-- main.go       <- AWS Lambda handler's definition
