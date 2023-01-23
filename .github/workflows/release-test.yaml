@@ -17,8 +17,8 @@ jobs:
       - name: Define the plugin
         id: pluginID
         run: |
-          echo "tag=$('${{ github.event.ref }}' | awk -F "/" '{print $NF}')" >> $GITHUB_OUTPUT
-          echo "plugin=$('${{ github.event.ref }}' | awk -F "/" '{print $(NF-1)}')" >> $GITHUB_OUTPUT
+          TAG=$(echo '${{ github.event.ref }}' | awk -F "/" '{print $NF}')
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
       - name: Test
         run: |
           echo "plugin/${{ steps.pluginID.outputs.plugin }}/.release_notes/${{ steps.pluginID.outputs.tag }}.md"
