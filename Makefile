@@ -22,5 +22,5 @@ compile:
  		go mod tidy && \
   		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../../bin/$(PLUGIN) -ldflags="-s -w" ./cmd/lambda/main.go
 
-build: compile ## Builds the lambda binary and archives it.z
+build: compile ## Builds the lambda binary and archives it.
 	@ cd bin && zip -9 $(PLUGIN).zip $(PLUGIN) && rm $(PLUGIN)
