@@ -1,0 +1,42 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'plugin/*'
+permissions:
+  contents: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Unshallow
+        run: git fetch --prune --unshallow
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      - name: Define the plugin
+        id: pluginID
+        run: |
+          echo "plugin=neon" >> $GITHUB_OUTPUT
+          echo "tag=v0.1.0" >> $GITHUB_OUTPUT
+      - name: Tests release notes
+        run: |
+          if [ ! -f plugin/${{ steps.pluginID.outputs.plugin }}/.release_notes/${{ steps.pluginID.outputs.tag }}.md ]; then exit 1; fi
+          if [ 1 -gt $(cat plugin/${{ steps.pluginID.outputs.plugin }}/.release_notes/${{ steps.pluginID.outputs.tag }}.md | wc -l) ]; then echo "empty release notes" && exit 137; fi
+      - name: Tests
+        run: make test-plugin PLUGIN=${{ steps.pluginID.outputs.plugin }}
+      - name: Build
+        id: build
+        run: make build PREFIX=aws-lambda-secret-rotation PLUGIN=${{ steps.pluginID.outputs.plugin }} TAG=${{ steps.pluginID.outputs.tag }}
+      - name: Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "bin/${{ steps.pluginID.outputs.plugin }}/*"
+          bodyFile: "plugin/${{ steps.pluginID.outputs.plugin }}/.release_notes/${{ steps.pluginID.outputs.tag }}.md"
+          replacesArtifacts: true
+          makeLatest: true
