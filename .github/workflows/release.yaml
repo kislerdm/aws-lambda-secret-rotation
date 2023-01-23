@@ -1,4 +1,4 @@
-name: Release
+name: "Release:Plugin"
 on:
   push:
     tags:
@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 jobs:
-  goreleaser:
+  release-plugin:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -22,8 +22,10 @@ jobs:
       - name: Define the plugin
         id: pluginID
         run: |
-          echo "plugin=neon" >> $GITHUB_OUTPUT
-          echo "tag=v0.1.0" >> $GITHUB_OUTPUT
+          TAG=$(echo '${{ github.event.ref }}' | awk -F "/" '{print $NF}')
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          PLUGIN=$(echo '${{ github.event.ref }}' | awk -F "/" '{print $(NF-1)}')
+          echo "plugin=${PLUGIN}" >> $GITHUB_OUTPUT
       - name: Tests release notes
         run: |
           if [ ! -f plugin/${{ steps.pluginID.outputs.plugin }}/.release_notes/${{ steps.pluginID.outputs.tag }}.md ]; then exit 1; fi
