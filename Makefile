@@ -15,12 +15,15 @@ test-plugin: ## Run plugin tests.
   		go test -timeout 3m --tags=unittest -v -coverprofile=.coverage.out . -coverpkg=. && \
 		go tool cover -func .coverage.out && rm .coverage.out
 
-
 compile:
 	@ test -d bin || mkdir -p bin && \
  		cd plugin/$(PLUGIN) && \
  		go mod tidy && \
-  		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../../bin/$(PLUGIN) -ldflags="-s -w" ./cmd/lambda/main.go
+  		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../../bin/$(PLUGIN)/lambda -ldflags="-s -w" ./cmd/lambda/main.go
+
+PREFIX := $(notdir ${PWD})
+TAG := ""
 
 build: compile ## Builds the lambda binary and archives it.
-	@ cd bin && zip -9 $(PLUGIN).zip $(PLUGIN) && rm $(PLUGIN)
+	@ if [ $(TAG) = "" ]; then echo "specify TAG"; exit 137; fi
+	@ cd bin/$(PLUGIN) && zip -9 $(PREFIX)_$(PLUGIN)_$(TAG).zip lambda && rm lambda
