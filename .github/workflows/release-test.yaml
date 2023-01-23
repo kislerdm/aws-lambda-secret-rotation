@@ -17,4 +17,4 @@ jobs:
       - name: Define the plugin
         id: pluginID
         run: |
-          echo "fromJSON(${{event.ref}})"
+          echo "fromJSON(${{ github.event.ref }})"
