@@ -846,13 +846,13 @@ func Test_validateEvent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				err := validateEvent(tt.args.ctx, tt.args.event, tt.args.client)
+				err := validateInput(tt.args.ctx, tt.args.event, tt.args.client)
 				if (err != nil) != tt.wantErr {
-					t.Errorf("validateEvent() error = %v, wantErr %v", err, tt.wantErr)
+					t.Errorf("validateInput() error = %v, wantErr %v", err, tt.wantErr)
 
 					if tt.errType != nil {
 						if !errors.Is(err, tt.errType) {
-							t.Errorf("validateEvent() returned error type does not match expectation")
+							t.Errorf("validateInput() returned error type does not match expectation")
 						}
 					}
 				}
@@ -936,6 +936,225 @@ func TestStrToBool(t *testing.T) {
 					s := fn(tt.args.s)
 					if got := StrToBool(s); got != tt.want {
 						t.Errorf("StrToBool() = %v, want %v", got, tt.want)
+					}
+				}
+			},
+		)
+	}
+}
+
+func TestNewHandler(t *testing.T) {
+	type args struct {
+		cfg Config
+	}
+	type argsHandler struct {
+		ctx   context.Context
+		event secretsmanagerTriggerPayload
+	}
+	tests := []struct {
+		name        string
+		args        args
+		argsHandler argsHandler
+		wantErrInit bool
+		wantErr     bool
+	}{
+		{
+			name: "unhappy path: SecretObj set to nil",
+			args: args{
+				cfg: Config{},
+			},
+			argsHandler: argsHandler{},
+			wantErrInit: true,
+			wantErr:     false,
+		},
+		{
+			name: "unhappy path: unknown step",
+			args: args{
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{
+						secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+						secretByID: map[string]map[string]string{
+							"foo": {
+								"AWSCURRENT": placeholderSecretUserStr,
+							},
+						},
+						rotationEnabled: aws.Bool(true),
+					},
+					SecretObj: &map[string]string{},
+					Debug:     true,
+				},
+			},
+			argsHandler: argsHandler{
+				ctx: context.TODO(),
+				event: secretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "foobar",
+				},
+			},
+			wantErrInit: false,
+			wantErr:     true,
+		},
+		{
+			name: "unhappy path: does not pass input validation",
+			args: args{
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{
+						secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+						secretByID: map[string]map[string]string{
+							"foo": {
+								"AWSCURRENT": placeholderSecretUserStr,
+							},
+						},
+					},
+					SecretObj: &map[string]string{},
+					Debug:     true,
+				},
+			},
+			argsHandler: argsHandler{
+				ctx: context.TODO(),
+				event: secretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "foobar",
+				},
+			},
+			wantErrInit: false,
+			wantErr:     true,
+		},
+		{
+			name: "happy path: createSecret step",
+			args: args{
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{
+						secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+						secretByID: map[string]map[string]string{
+							"foo": {
+								"AWSCURRENT": placeholderSecretUserStr,
+								"AWSPENDING": placeholderSecretUserNewStr,
+							},
+						},
+						rotationEnabled: aws.Bool(true),
+					},
+					ServiceClient: mockDBClient{},
+					SecretObj:     &map[string]string{},
+					Debug:         true,
+				},
+			},
+			argsHandler: argsHandler{
+				ctx: context.TODO(),
+				event: secretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "createSecret",
+				},
+			},
+			wantErrInit: false,
+			wantErr:     false,
+		},
+		{
+			name: "happy path: setSecret step",
+			args: args{
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{
+						secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+						secretByID: map[string]map[string]string{
+							"foo": {
+								"AWSCURRENT": placeholderSecretUserStr,
+								"AWSPENDING": placeholderSecretUserNewStr,
+							},
+						},
+						rotationEnabled: aws.Bool(true),
+					},
+					ServiceClient: mockDBClient{},
+					SecretObj:     &map[string]string{},
+					Debug:         true,
+				},
+			},
+			argsHandler: argsHandler{
+				ctx: context.TODO(),
+				event: secretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "setSecret",
+				},
+			},
+			wantErrInit: false,
+			wantErr:     false,
+		},
+		{
+			name: "happy path: testSecret step",
+			args: args{
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{
+						secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+						secretByID: map[string]map[string]string{
+							"foo": {
+								"AWSCURRENT": placeholderSecretUserStr,
+								"AWSPENDING": placeholderSecretUserNewStr,
+							},
+						},
+						rotationEnabled: aws.Bool(true),
+					},
+					ServiceClient: mockDBClient{},
+					SecretObj:     &map[string]string{},
+					Debug:         true,
+				},
+			},
+			argsHandler: argsHandler{
+				ctx: context.TODO(),
+				event: secretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "testSecret",
+				},
+			},
+			wantErrInit: false,
+			wantErr:     false,
+		},
+		{
+			name: "happy path: finishSecret step",
+			args: args{
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{
+						secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+						secretByID: map[string]map[string]string{
+							"foo": {
+								"AWSCURRENT": placeholderSecretUserStr,
+								"AWSPENDING": placeholderSecretUserNewStr,
+							},
+						},
+						rotationEnabled: aws.Bool(true),
+					},
+					ServiceClient: mockDBClient{},
+					SecretObj:     &map[string]string{},
+					Debug:         true,
+				},
+			},
+			argsHandler: argsHandler{
+				ctx: context.TODO(),
+				event: secretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "foo",
+					Step:      "finishSecret",
+				},
+			},
+			wantErrInit: false,
+			wantErr:     false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				handler, err := NewHandler(tt.args.cfg)
+				if (err != nil) != tt.wantErrInit {
+					t.Errorf("NewHandler() error = %v, wantErrInit %v", err, tt.wantErrInit)
+					return
+				}
+				if !tt.wantErrInit {
+					if err := handler(tt.argsHandler.ctx, tt.argsHandler.event); (err != nil) != tt.wantErr {
+						t.Errorf("handler(ctx, event) error = %v, wantErr %v", err, tt.wantErr)
+						return
 					}
 				}
 			},

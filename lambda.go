@@ -43,13 +43,10 @@ type secretsmanagerTriggerPayload struct {
 	Step string `json:"Step"`
 }
 
-// Handler the type defining the lambda handler function.
-type Handler func(ctx context.Context, event secretsmanagerTriggerPayload) error
-
 // NewHandler initialises lambda handler.
-func NewHandler(cfg Config) (Handler, error) {
-	if err := validateConfig(cfg); err != nil {
-		return nil, err
+func NewHandler(cfg Config) (func(ctx context.Context, event secretsmanagerTriggerPayload) error, error) {
+	if cfg.SecretObj == nil {
+		return nil, errors.New("configuration for SecretObj type must be set")
 	}
 
 	return func(ctx context.Context, event secretsmanagerTriggerPayload) error {
@@ -58,7 +55,7 @@ func NewHandler(cfg Config) (Handler, error) {
 				"[DEBUG] arn: " + event.SecretARN + "; step: " + event.Step + "; token: " + event.Token + "\n",
 			)
 		}
-		if err := validateEvent(ctx, event, cfg.SecretsmanagerClient); err != nil {
+		if err := validateInput(ctx, event, cfg.SecretsmanagerClient); err != nil {
 			if cfg.Debug {
 				log.Println("[DEBUG] validation error:+" + err.Error() + "\n")
 			}
@@ -79,13 +76,6 @@ func NewHandler(cfg Config) (Handler, error) {
 			return errors.New("unknown step " + s)
 		}
 	}, nil
-}
-
-func validateConfig(cfg Config) error {
-	if cfg.SecretObj == nil {
-		return errors.New("configuration for SecretObj type must be set")
-	}
-	return nil
 }
 
 // SecretsmanagerClient client to communicate with the secretsmanager.
@@ -122,8 +112,8 @@ type ServiceClient interface {
 	Test(ctx context.Context, secret any) error
 }
 
-// validateEvent checks if the secret version is staged correctly.
-func validateEvent(ctx context.Context, event secretsmanagerTriggerPayload, client SecretsmanagerClient) error {
+// validateInput checks if the secret version is staged correctly.
+func validateInput(ctx context.Context, event secretsmanagerTriggerPayload, client SecretsmanagerClient) error {
 	v, err := client.DescribeSecret(
 		ctx, &secretsmanager.DescribeSecretInput{
 			SecretId: aws.String(event.SecretARN),
