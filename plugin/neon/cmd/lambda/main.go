@@ -5,11 +5,13 @@ import (
 	"log"
 	"os"
 
+	"github.com/aws/aws-lambda-go/lambda"
 	dbclient "github.com/kislerdm/aws-lambda-secret-rotation/plugin/neon"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	lambda "github.com/kislerdm/aws-lambda-secret-rotation"
+	secretRotation "github.com/kislerdm/aws-lambda-secret-rotation"
+
 	sdk "github.com/kislerdm/neon-sdk-go"
 )
 
@@ -34,7 +36,7 @@ func main() {
 	}
 
 	var adminSecret dbclient.SecretAdmin
-	if err := lambda.ExtractSecretObject(v, &adminSecret); err != nil {
+	if err := secretRotation.ExtractSecretObject(v, &adminSecret); err != nil {
 		log.Fatalln(err)
 	}
 
@@ -44,12 +46,17 @@ func main() {
 	}
 
 	var s dbclient.SecretUser
-	lambda.Start(
-		lambda.Config{
+	handler, err := secretRotation.NewHandler(
+		secretRotation.Config{
 			SecretsmanagerClient: clientSecretsManager,
 			ServiceClient:        dbclient.NewServiceClient(clientNeon),
 			SecretObj:            &s,
-			Debug:                lambda.StrToBool(os.Getenv("DEBUG")),
+			Debug:                secretRotation.StrToBool(os.Getenv("DEBUG")),
 		},
 	)
+	if err != nil {
+		log.Fatalf("unable to init lambda handler to rotate secret, %v", err)
+	}
+
+	lambda.Start(handler)
 }

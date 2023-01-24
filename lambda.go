@@ -9,7 +9,6 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
@@ -44,37 +43,49 @@ type secretsmanagerTriggerPayload struct {
 	Step string `json:"Step"`
 }
 
-// Start defines the lambda handler.
-func Start(cfg Config) {
-	lambda.Start(
-		func(ctx context.Context, event secretsmanagerTriggerPayload) error {
-			if cfg.Debug {
-				log.Println(
-					"[DEBUG] arn: " + event.SecretARN + "; step: " + event.Step + "; token: " + event.Token + "\n",
-				)
-			}
-			if err := validateEvent(ctx, event, cfg.SecretsmanagerClient); err != nil {
-				if cfg.Debug {
-					log.Println("[DEBUG] validation error:+" + err.Error() + "\n")
-				}
-				return err
-			}
+// Handler the type defining the lambda handler function.
+type Handler func(ctx context.Context, event secretsmanagerTriggerPayload) error
 
-			// routes to appropriate step.
-			switch s := event.Step; s {
-			case "createSecret":
-				return createSecret(ctx, event, cfg)
-			case "setSecret":
-				return setSecret(ctx, event, cfg)
-			case "testSecret":
-				return testSecret(ctx, event, cfg)
-			case "finishSecret":
-				return finishSecret(ctx, event, cfg)
-			default:
-				return errors.New("unknown step " + s)
+// NewHandler initialises lambda handler.
+func NewHandler(cfg Config) (Handler, error) {
+	if err := validateConfig(cfg); err != nil {
+		return nil, err
+	}
+
+	return func(ctx context.Context, event secretsmanagerTriggerPayload) error {
+		if cfg.Debug {
+			log.Println(
+				"[DEBUG] arn: " + event.SecretARN + "; step: " + event.Step + "; token: " + event.Token + "\n",
+			)
+		}
+		if err := validateEvent(ctx, event, cfg.SecretsmanagerClient); err != nil {
+			if cfg.Debug {
+				log.Println("[DEBUG] validation error:+" + err.Error() + "\n")
 			}
-		},
-	)
+			return err
+		}
+
+		// routes to appropriate step.
+		switch s := event.Step; s {
+		case "createSecret":
+			return createSecret(ctx, event, cfg)
+		case "setSecret":
+			return setSecret(ctx, event, cfg)
+		case "testSecret":
+			return testSecret(ctx, event, cfg)
+		case "finishSecret":
+			return finishSecret(ctx, event, cfg)
+		default:
+			return errors.New("unknown step " + s)
+		}
+	}, nil
+}
+
+func validateConfig(cfg Config) error {
+	if cfg.SecretObj == nil {
+		return errors.New("configuration for SecretObj type must be set")
+	}
+	return nil
 }
 
 // SecretsmanagerClient client to communicate with the secretsmanager.
