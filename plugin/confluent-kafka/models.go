@@ -1,4 +1,4 @@
-package neon
+package confluent
 
 // SecretAdmin defines the secret with the db admin access details.
 type SecretAdmin struct {
@@ -9,13 +9,7 @@ type SecretAdmin struct {
 }
 
 // SecretUser defines the secret with db user access details.
-type SecretUser struct {
-	ServiceAccountID string `json:"user_id"`
-	ClusterID        string `json:"cluster_id"`
-	// Kafka bootstrap server
-	BootstrapServer string `json:"bootstrap_server"`
-	// Kafka SASL user
-	User string `json:"user"`
-	// Kafka SASL password
-	Password string `json:"password"`
-}
+// The map of attributes must include
+// user 	<- API Key
+// password <- API Secret
+type SecretUser map[string]string
