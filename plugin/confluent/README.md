@@ -1,4 +1,4 @@
-# Plugin for AWS Lambda to rotate Confluent Cloud Kafka credentials
+# Plugin for AWS Lambda to rotate Confluent Cloud API Key
 
 [![logo](https://login-static.confluent.io/web/3.799.1/favicon.ico)](https://www.confluent.io/)
 

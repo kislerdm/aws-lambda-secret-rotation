@@ -1,4 +1,4 @@
-module github.com/kislerdm/aws-lambda-secret-rotation/plugin/confluent-kafka
+module github.com/kislerdm/aws-lambda-secret-rotation/plugin/confluent
 
 go 1.19
 

@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/aws/aws-lambda-go/lambda"
-	confluentClient "github.com/kislerdm/aws-lambda-secret-rotation/plugin/confluent-kafka"
+	confluentClient "github.com/kislerdm/aws-lambda-secret-rotation/plugin/confluent"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
