@@ -60,7 +60,8 @@ Every plugin is distributed as a separate Go module.
 
 #### List of Plugins
 
-- [neon](plugin/neon): plugin to change user's password in the [Neon](https://neon.tech/) SaaS Postgres service
+- [neon](plugin/neon): plugin to change user's password in the [Neon](https://neon.tech/) SaaS Postgres service.
+- [confluent](plugin/confluent): plugin to rotate [Confluent Cloud](https://www.confluent.io/) API keys.
 
 #### Plugin Codebase Structure
 
@@ -80,9 +81,11 @@ It is recommended to use the template to develop and distribute plugin's codebas
 |   |-- v0.0.1.md
 |   |-- ...   
 |   `-- vx.y.z.md
-`-- cmd
-    `-- lambda
-        `-- main.go       <- AWS Lambda handler's definition
+|-- cmd
+|   `-- lambda
+|       `-- main.go       <- AWS Lambda handler's definition
+`-- example
+    `-- main.tf           <- (optional) terraform example to provision resources to rotate "Secret User" secret
 ```
 
 ## Contribution
