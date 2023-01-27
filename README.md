@@ -84,8 +84,7 @@ It is recommended to use the template to develop and distribute plugin's codebas
 |-- cmd
 |   `-- lambda
 |       `-- main.go       <- AWS Lambda handler's definition
-`-- example
-    `-- main.tf           <- (optional) terraform example to provision resources to rotate "Secret User" secret
+`-- example               <- (optional) terraform example to provision resources to rotate "Secret User" secret
 ```
 
 ## Contribution

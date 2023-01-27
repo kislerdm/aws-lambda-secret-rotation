@@ -14,13 +14,28 @@ terraform {
 variable "confluent_key_id" {
   type        = string
   sensitive   = true
-  description = "Confluent API KEY"
+  description = "Confluent API KEY."
 }
 
 variable "confluent_secret" {
   type        = string
   sensitive   = true
-  description = "Confluent API Secret"
+  description = "Confluent API Secret."
+}
+
+variable "cluster_id" {
+  type        = string
+  description = "Confluent Kafka Cluster ID."
+}
+
+variable "environment_id" {
+  type        = string
+  description = "Confluent Environment ID."
+}
+
+variable "kafka_boostrap_server" {
+  type        = string
+  description = "Kafka bootstrap server."
 }
 
 provider "confluent" {
@@ -29,10 +44,6 @@ provider "confluent" {
 }
 
 locals {
-  cluster_id       = "lkc-3xpgj"
-  environment_id   = "env-yny5j"
-  bootstrap_server = "pkc-4r297.europe-west1.gcp.confluent.cloud:9092"
-
   sa = { "foo-bar" : "" }
 }
 
@@ -44,7 +55,7 @@ resource "confluent_service_account" "this" {
 
 resource "confluent_api_key" "this" {
   for_each     = local.sa
-  display_name = "${local.cluster_id}:${each.key}"
+  display_name = "${var.cluster_id}:${each.key}"
   description  = "API key for ${each.key}"
 
   owner {
@@ -54,17 +65,17 @@ resource "confluent_api_key" "this" {
   }
 
   managed_resource {
-    id          = local.cluster_id
+    id          = var.cluster_id
     kind        = "Cluster"
     api_version = "cmk/v2"
     environment {
-      id = local.environment_id
+      id = var.environment_id
     }
   }
 
-  lifecycle {
-    prevent_destroy = true
-  }
+  #  lifecycle {
+  #    prevent_destroy = true
+  #  }
 }
 
 resource "aws_secretsmanager_secret" "admin" {
@@ -106,13 +117,123 @@ resource "aws_secretsmanager_secret_version" "this" {
   secret_string = jsonencode({
     user             = confluent_api_key.this[each.key].id
     password         = confluent_api_key.this[each.key].secret
-    bootstrap_server = local.bootstrap_server
-
-    meta = {
-      cluster_id     = local.cluster_id
-      environment_id = local.environment_id
-      user_id        = confluent_service_account.this[each.key].id
-      client_id      = each.key
-    }
+    bootstrap_server = var.kafka_boostrap_server
   })
+}
+
+resource "aws_secretsmanager_secret_rotation" "this" {
+  for_each            = local.sa
+  secret_id           = aws_secretsmanager_secret.this[each.key].id
+  rotation_lambda_arn = aws_lambda_function.this.arn
+  rotation_rules {
+    automatically_after_days = 1
+  }
+}
+
+#### Lambda
+
+locals {
+  plugin      = "confluent"
+  lambda_name = "${local.plugin}-key-rotation"
+}
+
+
+resource "aws_iam_policy" "this" {
+  name   = "LambdaSecretRotation@confluent"
+  policy = jsonencode({
+    Version   = "2012-10-17"
+    Statement = concat([
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+        ]
+        Resource = ["arn:aws:logs:*:*:*"]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetResourcePolicy",
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:UpdateSecretVersionStage",
+          "secretsmanager:DescribeSecret",
+        ]
+        Resource = [for i in aws_secretsmanager_secret.this : i.arn]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = [aws_secretsmanager_secret.admin.arn]
+      },
+    ]
+    )
+  })
+}
+
+resource "aws_iam_role" "this" {
+  name = "secret-rotation@neon-user"
+
+  assume_role_policy = jsonencode({
+    Version   = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Action    = "sts:AssumeRole"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_neon" {
+  policy_arn = aws_iam_policy.this.arn
+  role       = aws_iam_role.this.name
+}
+
+resource "aws_cloudwatch_log_group" "this" {
+  name              = "/aws/lambda/${local.plugin}"
+  retention_in_days = 1
+}
+
+resource "null_resource" "this" {
+  provisioner "local-exec" {
+    command = "cd ${path.module}/../../.. && make build PLUGIN=${local.plugin} TAG=local"
+  }
+}
+
+data "local_file" "this" {
+  filename   = "${path.module}/../../../bin/confluent/aws-lambda-secret-rotation_confluent_local.zip"
+  depends_on = [null_resource.this]
+}
+
+resource "aws_lambda_function" "this" {
+  function_name = local.lambda_name
+  role          = aws_iam_role.this.arn
+
+  filename         = data.local_file.this.filename
+  source_code_hash = base64sha256(data.local_file.this.content_base64)
+  runtime          = "go1.x"
+  handler          = "lambda"
+  memory_size      = 256
+  timeout          = 30
+
+  environment {
+    variables = {
+      ADMIN_SECRET_ARN = aws_secretsmanager_secret.admin.arn
+    }
+  }
+}
+
+resource "aws_lambda_permission" "secretsmanager" {
+  for_each      = local.sa
+  statement_id  = "${local.lambda_name}-${each.key}"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.this.function_name
+  principal     = "secretsmanager.amazonaws.com"
+  source_arn    = aws_secretsmanager_secret.this[each.key].arn
 }
