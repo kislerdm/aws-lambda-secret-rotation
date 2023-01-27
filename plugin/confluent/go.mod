@@ -8,7 +8,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.18.1
 	github.com/confluentinc/ccloud-sdk-go-v2/apikeys v0.4.0
 	github.com/kislerdm/aws-lambda-secret-rotation v0.1.1
-	github.com/kislerdm/neon-sdk-go v0.1.4
 )
 
 require (

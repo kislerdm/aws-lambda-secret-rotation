@@ -29,10 +29,9 @@ provider "confluent" {
 }
 
 locals {
-  cluster_id          = "lkc-3xpgj"
-  environment_id      = "env-yny5j"
-  bootstrap_server    = "pkc-4r297.europe-west1.gcp.confluent.cloud:9092"
-  kafka_rest_endpoint = "https://pkc-4r297.europe-west1.gcp.confluent.cloud:443"
+  cluster_id       = "lkc-3xpgj"
+  environment_id   = "env-yny5j"
+  bootstrap_server = "pkc-4r297.europe-west1.gcp.confluent.cloud:9092"
 
   sa = { "foo-bar" : "" }
 }
@@ -107,8 +106,13 @@ resource "aws_secretsmanager_secret_version" "this" {
   secret_string = jsonencode({
     user             = confluent_api_key.this[each.key].id
     password         = confluent_api_key.this[each.key].secret
-    cluster_id       = local.cluster_id
     bootstrap_server = local.bootstrap_server
-    user_id          = confluent_service_account.this[each.key].id
+
+    meta = {
+      cluster_id     = local.cluster_id
+      environment_id = local.environment_id
+      user_id        = confluent_service_account.this[each.key].id
+      client_id      = each.key
+    }
   })
 }

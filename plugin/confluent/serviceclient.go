@@ -3,28 +3,73 @@ package confluent
 import (
 	"context"
 	"errors"
+	"reflect"
 
 	sdk "github.com/confluentinc/ccloud-sdk-go-v2/apikeys/v2"
 	lambda "github.com/kislerdm/aws-lambda-secret-rotation"
 )
 
 // NewServiceClient initiates the `ServiceClient` to rotate credentials for Confluent Kafka user.
-func NewServiceClient(client *sdk.APIClient) lambda.ServiceClient {
-	return &dbClient{c: client}
+func NewServiceClient(client *sdk.APIClient, attributeKey, attributeSecret string) lambda.ServiceClient {
+	if attributeKey == "" {
+		attributeKey = "user"
+	}
+	if attributeSecret == "" {
+		attributeSecret = "password"
+	}
+	return &dbClient{c: client, attributeKey: attributeKey, attributeSecret: attributeSecret}
 }
 
 type dbClient struct {
-	KeyUser     string
-	KeyPassword string
-	c           *sdk.APIClient
+	attributeKey    string
+	attributeSecret string
+	c               *sdk.APIClient
 }
 
 func (c dbClient) Set(ctx context.Context, secretCurrent, secretPending, secretPrevious any) error {
-	panic("todo")
+	if err := c.Test(ctx, secretCurrent); err != nil {
+		return errors.New("current secret error: " + err.Error())
+	}
+
+	if err := c.Test(ctx, secretPending); err != nil {
+		return errors.New("pending secret error: " + err.Error())
+	}
+
+	current := secretCurrent.(SecretUser)
+	pending := secretPending.(SecretUser)
+
+	if current[c.attributeKey] == pending[c.attributeKey] {
+		return errors.New(`API key "` + c.attributeKey + `" shall be modified`)
+	}
+
+	if current[c.attributeSecret] == pending[c.attributeSecret] {
+		return errors.New(`API secret "` + c.attributeSecret + `" shall be modified`)
+	}
+
+	current[c.attributeKey] = ""
+	current[c.attributeSecret] = ""
+	pending[c.attributeKey] = ""
+	pending[c.attributeSecret] = ""
+
+	if !reflect.DeepEqual(current, pending) {
+		return errors.New("additional attributes of the current and pending secrets shall match")
+	}
+
+	return nil
 }
 
 func (c dbClient) Test(ctx context.Context, secret any) error {
-	panic("todo")
+	s, ok := secret.(SecretUser)
+	if !ok {
+		return errors.New("wrong secret type")
+	}
+	if _, ok := s[c.attributeKey]; !ok {
+		return errors.New(`wrong secret type: "` + c.attributeKey + `" field not found`)
+	}
+	if _, ok := s[c.attributeSecret]; !ok {
+		return errors.New(`wrong secret type: "` + c.attributeSecret + `" field not found`)
+	}
+	return nil
 }
 
 func (c dbClient) Create(ctx context.Context, secret any) error {
@@ -33,9 +78,9 @@ func (c dbClient) Create(ctx context.Context, secret any) error {
 		return errors.New("wrong secret type")
 	}
 
-	id, ok := s[c.KeyUser]
+	id, ok := s[c.attributeKey]
 	if !ok {
-		return errors.New("wrong secret type: 'user' field")
+		return errors.New(`wrong secret type: "` + c.attributeKey + `" field not found`)
 	}
 
 	currentKey, err := readKey(ctx, c.c.APIKeysIamV2Api, id)
@@ -52,10 +97,10 @@ func (c dbClient) Create(ctx context.Context, secret any) error {
 		return err
 	}
 
-	s[c.KeyUser] = createdKey.GetId()
+	s[c.attributeKey] = createdKey.GetId()
 
 	sp, _ := createdKey.GetSpecOk()
-	s[c.KeyPassword] = sp.GetSecret()
+	s[c.attributeSecret] = sp.GetSecret()
 
 	secret = s
 	return nil

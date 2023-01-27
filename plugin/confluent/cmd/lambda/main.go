@@ -60,9 +60,11 @@ func main() {
 	handler, err := secretRotation.NewHandler(
 		secretRotation.Config{
 			SecretsmanagerClient: clientSecretsManager,
-			ServiceClient:        confluentClient.NewServiceClient(client),
-			SecretObj:            &s,
-			Debug:                secretRotation.StrToBool(os.Getenv("DEBUG")),
+			ServiceClient: confluentClient.NewServiceClient(
+				client, os.Getenv("ATTRIBUTE_KEY"), os.Getenv("ATTRIBUTE_SECRET"),
+			),
+			SecretObj: &s,
+			Debug:     secretRotation.StrToBool(os.Getenv("DEBUG")),
 		},
 	)
 	if err != nil {

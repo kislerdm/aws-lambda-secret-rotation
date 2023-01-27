@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"reflect"
 	"testing"
 
 	sdk "github.com/confluentinc/ccloud-sdk-go-v2/apikeys/v2"
+	lambda "github.com/kislerdm/aws-lambda-secret-rotation"
 )
 
 const (
@@ -342,9 +344,9 @@ func Test_dbClient_Create(t *testing.T) {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				c := dbClient{
-					KeyUser:     tt.fields.KeyUser,
-					KeyPassword: tt.fields.KeyPassword,
-					c:           tt.fields.c,
+					attributeKey:    tt.fields.KeyUser,
+					attributeSecret: tt.fields.KeyPassword,
+					c:               tt.fields.c,
 				}
 				if err := c.Create(tt.args.ctx, tt.args.secret); (err != nil) != tt.wantErr {
 					t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
@@ -363,4 +365,276 @@ func Test_dbClient_Create(t *testing.T) {
 
 func optString(s string) *string {
 	return &s
+}
+
+func Test_dbClient_Set(t *testing.T) {
+	type fields struct {
+		KeyUser     string
+		KeyPassword string
+		c           *sdk.APIClient
+	}
+	type args struct {
+		ctx            context.Context
+		secretCurrent  any
+		secretPending  any
+		secretPrevious any
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "happy path",
+			fields: fields{
+				KeyUser:     "user",
+				KeyPassword: "password",
+			},
+			args: args{
+				ctx:           context.TODO(),
+				secretCurrent: SecretUser{"user": "foo", "password": "bar", "host": "localhost:9092"},
+				secretPending: SecretUser{"user": "foo-new", "password": "bar-new", "host": "localhost:9092"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "unhappy path: wrong type of the current secret",
+			fields: fields{
+				KeyUser:     "user",
+				KeyPassword: "password",
+			},
+			args: args{
+				ctx:           context.TODO(),
+				secretCurrent: "foo",
+				secretPending: SecretUser{"user": "foo-new", "password": "bar-new", "host": "localhost:9092"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: wrong type of the pending secret",
+			fields: fields{
+				KeyUser:     "user",
+				KeyPassword: "password",
+			},
+			args: args{
+				ctx:           context.TODO(),
+				secretCurrent: SecretUser{"user": "foo", "password": "bar", "host": "localhost:9092"},
+				secretPending: "bar",
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: api keys match",
+			fields: fields{
+				KeyUser:     "user",
+				KeyPassword: "password",
+			},
+			args: args{
+				ctx:           context.TODO(),
+				secretCurrent: SecretUser{"user": "foo", "password": "bar", "host": "localhost:9092"},
+				secretPending: SecretUser{"user": "foo", "password": "bar-new", "host": "localhost:9092"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: api secrets match",
+			fields: fields{
+				KeyUser:     "user",
+				KeyPassword: "password",
+			},
+			args: args{
+				ctx:           context.TODO(),
+				secretCurrent: SecretUser{"user": "foo", "password": "bar", "host": "localhost:9092"},
+				secretPending: SecretUser{"user": "foo-new", "password": "bar", "host": "localhost:9092"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: additional attributes do not match",
+			fields: fields{
+				KeyUser:     "user",
+				KeyPassword: "password",
+			},
+			args: args{
+				ctx: context.TODO(),
+				secretCurrent: SecretUser{
+					"user": "foo", "password": "bar", "host": "localhost:29092", "client_id": "quxx",
+				},
+				secretPending: SecretUser{"user": "foo-new", "password": "bar-new", "host": "localhost:9092"},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				c := dbClient{
+					attributeKey:    tt.fields.KeyUser,
+					attributeSecret: tt.fields.KeyPassword,
+					c:               tt.fields.c,
+				}
+				if err := c.Set(
+					tt.args.ctx, tt.args.secretCurrent, tt.args.secretPending, tt.args.secretPrevious,
+				); (err != nil) != tt.wantErr {
+					t.Errorf("Set() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			},
+		)
+	}
+}
+
+func Test(t *testing.T) {
+	type fields struct {
+		KeyUser     string
+		KeyPassword string
+		c           *sdk.APIClient
+	}
+	type args struct {
+		ctx    context.Context
+		secret any
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "happy path",
+			fields: fields{
+				KeyUser:     "user",
+				KeyPassword: "password",
+			},
+			args: args{
+				ctx:    context.TODO(),
+				secret: SecretUser{"user": "foo", "password": "bar", "host": "localhost:9092", "attr01": "baz"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "unhappy path: wrong secret type",
+			fields: fields{
+				KeyUser:     "user",
+				KeyPassword: "password",
+			},
+			args: args{
+				ctx:    context.TODO(),
+				secret: "foo",
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: api key field missing",
+			fields: fields{
+				KeyUser:     "user",
+				KeyPassword: "password",
+			},
+			args: args{
+				ctx:    context.TODO(),
+				secret: SecretUser{"password": "bar", "host": "localhost:9092", "attr01": "baz"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: api secret field missing",
+			fields: fields{
+				KeyUser:     "user",
+				KeyPassword: "password",
+			},
+			args: args{
+				ctx:    context.TODO(),
+				secret: SecretUser{"user": "foo", "host": "localhost:9092", "attr01": "baz"},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				c := dbClient{
+					attributeKey:    tt.fields.KeyUser,
+					attributeSecret: tt.fields.KeyPassword,
+					c:               tt.fields.c,
+				}
+				if err := c.Test(tt.args.ctx, tt.args.secret); (err != nil) != tt.wantErr {
+					t.Errorf("Test() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			},
+		)
+	}
+}
+
+func TestNewServiceClient(t *testing.T) {
+	type args struct {
+		client          *sdk.APIClient
+		attributeKey    string
+		attributeSecret string
+	}
+	tests := []struct {
+		name string
+		args args
+		want lambda.ServiceClient
+	}{
+		{
+			name: "happy path",
+			args: args{
+				client: &sdk.APIClient{
+					APIKeysIamV2Api: &mockAPIKeysIamV2Api{},
+				},
+				attributeKey:    "foo",
+				attributeSecret: "bar",
+			},
+			want: &dbClient{
+				attributeKey:    "foo",
+				attributeSecret: "bar",
+				c: &sdk.APIClient{
+					APIKeysIamV2Api: &mockAPIKeysIamV2Api{},
+				},
+			},
+		},
+		{
+			name: "happy path: default key",
+			args: args{
+				client: &sdk.APIClient{
+					APIKeysIamV2Api: &mockAPIKeysIamV2Api{},
+				},
+				attributeSecret: "bar",
+			},
+			want: &dbClient{
+				attributeKey:    "user",
+				attributeSecret: "bar",
+				c: &sdk.APIClient{
+					APIKeysIamV2Api: &mockAPIKeysIamV2Api{},
+				},
+			},
+		},
+		{
+			name: "happy path: default secret",
+			args: args{
+				client: &sdk.APIClient{
+					APIKeysIamV2Api: &mockAPIKeysIamV2Api{},
+				},
+				attributeKey: "foo",
+			},
+			want: &dbClient{
+				attributeKey:    "foo",
+				attributeSecret: "password",
+				c: &sdk.APIClient{
+					APIKeysIamV2Api: &mockAPIKeysIamV2Api{},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if got := NewServiceClient(
+					tt.args.client, tt.args.attributeKey, tt.args.attributeSecret,
+				); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("NewServiceClient() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
 }
