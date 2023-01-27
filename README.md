@@ -80,9 +80,11 @@ It is recommended to use the template to develop and distribute plugin's codebas
 |   |-- v0.0.1.md
 |   |-- ...   
 |   `-- vx.y.z.md
-`-- cmd
-    `-- lambda
-        `-- main.go       <- AWS Lambda handler's definition
+|-- cmd
+|   `-- lambda
+|       `-- main.go       <- AWS Lambda handler's definition
+`-- example
+    `-- main.tf           <- (optional) terraform example to provision resources to rotate "Secret User" secret
 ```
 
 ## Contribution
