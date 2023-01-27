@@ -60,7 +60,8 @@ Every plugin is distributed as a separate Go module.
 
 #### List of Plugins
 
-- [neon](plugin/neon): plugin to change user's password in the [Neon](https://neon.tech/) SaaS Postgres service
+- [neon](plugin/neon): plugin to change user's password in the [Neon](https://neon.tech/) SaaS Postgres service.
+- [confluent](plugin/confluent): plugin to rotate [Confluent Cloud](https://www.confluent.io/) API keys.
 
 #### Plugin Codebase Structure
 
