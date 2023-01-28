@@ -66,7 +66,7 @@ resource "aws_secretsmanager_secret" "admin" {
 }
 
 resource "aws_secretsmanager_secret_version" "admin" {
-  secret_id     = aws_secretsmanager_secret.admin.id
+  secret_id = aws_secretsmanager_secret.admin.id
   secret_string = jsonencode({
     token = var.neon_api_key
   })
@@ -94,7 +94,7 @@ resource "aws_secretsmanager_secret_rotation" "this" {
 }
 
 resource "aws_secretsmanager_secret_version" "this" {
-  secret_id     = aws_secretsmanager_secret.this.id
+  secret_id = aws_secretsmanager_secret.this.id
   secret_string = jsonencode({
     project_id = neon_project.this.id
     branch_id  = neon_branch.this.id
@@ -108,9 +108,9 @@ resource "aws_secretsmanager_secret_version" "this" {
 #### Lambda
 
 resource "aws_iam_policy" "this" {
-  name   = "LambdaSecretRotation@${local.plugin}"
+  name = "LambdaSecretRotation@${local.plugin}"
   policy = jsonencode({
-    Version   = "2012-10-17"
+    Version = "2012-10-17"
     Statement = concat([
       {
         Effect = "Allow"
@@ -137,7 +137,7 @@ resource "aws_iam_policy" "this" {
         Action   = ["secretsmanager:GetSecretValue"]
         Resource = [aws_secretsmanager_secret.admin.arn]
       },
-    ]
+      ]
     )
   })
 }
@@ -146,11 +146,11 @@ resource "aws_iam_role" "this" {
   name = "secret-rotation@${local.plugin}"
 
   assume_role_policy = jsonencode({
-    Version   = "2012-10-17"
+    Version = "2012-10-17"
     Statement = [
       {
-        Effect    = "Allow"
-        Action    = "sts:AssumeRole"
+        Effect = "Allow"
+        Action = "sts:AssumeRole"
         Principal = {
           Service = "lambda.amazonaws.com"
         }
@@ -172,11 +172,11 @@ resource "aws_cloudwatch_log_group" "this" {
 resource "null_resource" "this" {
   triggers = {
     md5 = join(",", [
-    for file in concat(
-      [for f in fileset("${path.module}/../../../", "{*.go,go.mod,go.sum}") : "${path.module}/../../../${f}"],
-      [for f in fileset("${path.module}/../../../plugin/${local.plugin}", "{*.go,go.mod,go.sum}") : "${path.module}/../../../plugin/${local.plugin}/${f}"],
-      [for f in fileset("${path.module}/../../../plugin/${local.plugin}/cmd/lambda/", "*.go") : "${path.module}/../../../plugin/${local.plugin}/cmd/lambda/${f}"],
-    ) : filemd5(file)
+      for file in concat(
+        [for f in fileset("${path.module}/../../../", "{*.go,go.mod,go.sum}") : "${path.module}/../../../${f}"],
+        [for f in fileset("${path.module}/../../../plugin/${local.plugin}", "{*.go,go.mod,go.sum}") : "${path.module}/../../../plugin/${local.plugin}/${f}"],
+        [for f in fileset("${path.module}/../../../plugin/${local.plugin}/cmd/lambda/", "*.go") : "${path.module}/../../../plugin/${local.plugin}/cmd/lambda/${f}"],
+      ) : filemd5(file)
     ])
   }
 
