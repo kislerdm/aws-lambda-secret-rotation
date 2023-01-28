@@ -46,8 +46,9 @@ jobs:
       - name: Mod tidy
         run: go mod tidy
       - name: Test
-        run: go test -race -coverprofile=coverage.txt -covermode=atomic
+        run: go test -race -coverprofile=coverage-${{ matrix.plugin }}.txt -covermode=atomic
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           flags: ${{ matrix.plugin }}
+          files: coverage-${{ matrix.plugin }}.txt
