@@ -203,8 +203,8 @@ resource "aws_lambda_function" "this" {
 
   environment {
     variables = {
-      ADMIN_SECRET_ARN = aws_secretsmanager_secret.admin.arn
-      DEBUG            = "true"
+      NEON_TOKEN_SECRET_ARN = aws_secretsmanager_secret.admin.arn
+      DEBUG                 = "true"
     }
   }
 
