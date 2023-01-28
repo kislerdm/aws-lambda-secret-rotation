@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"reflect"
 	"strings"
 	"unsafe"
 
@@ -269,17 +270,17 @@ func setSecret(ctx context.Context, event secretsmanagerTriggerPayload, cfg Conf
 		log.Println("[DEBUG] call cfg.ServiceClient.Set()")
 	}
 
-	current := cfg.SecretObj
+	current := initNewSecretObj(cfg.SecretObj)
 	if err := ExtractSecretObject(secretCurrent, current); err != nil {
 		return err
 	}
 
-	pending := cfg.SecretObj
+	pending := initNewSecretObj(cfg.SecretObj)
 	if err := ExtractSecretObject(secretPending, pending); err != nil {
 		return err
 	}
 
-	previous := cfg.SecretObj
+	previous := initNewSecretObj(cfg.SecretObj)
 	if secretPrevious != nil {
 		if err := ExtractSecretObject(secretPending, previous); err != nil {
 			return err
@@ -287,6 +288,80 @@ func setSecret(ctx context.Context, event secretsmanagerTriggerPayload, cfg Conf
 	}
 
 	return cfg.ServiceClient.Set(ctx, current, pending, previous)
+}
+
+func initNewSecretObj(obj any) any {
+	// by Heye Voecking <heye.voecking@gmail.com>
+	// https://gist.github.com/hvoecking/10772475
+	original := reflect.ValueOf(obj)
+	o := reflect.New(original.Type()).Elem()
+	translateRecursive(o, original)
+
+	return o.Interface()
+}
+
+func translateRecursive(copy, original reflect.Value) {
+	switch original.Kind() {
+	// The first cases handle nested structures and translate them recursively
+
+	// If it is a pointer we need to unwrap and call once again
+	case reflect.Ptr:
+		// To get the actual value of the original we have to call Elem()
+		// At the same time this unwraps the pointer so we don't end up in
+		// an infinite recursion
+		originalValue := original.Elem()
+		// Check if the pointer is nil
+		if !originalValue.IsValid() {
+			return
+		}
+		// Allocate a new object and set the pointer to it
+		copy.Set(reflect.New(originalValue.Type()))
+		// Unwrap the newly created pointer
+		translateRecursive(copy.Elem(), originalValue)
+
+	// If it is an interface (which is very similar to a pointer), do basically the
+	// same as for the pointer. Though a pointer is not the same as an interface so
+	// note that we have to call Elem() after creating a new object because otherwise
+	// we would end up with an actual pointer
+	case reflect.Interface:
+		// Get rid of the wrapping interface
+		originalValue := original.Elem()
+		// Create a new object. Now new gives us a pointer, but we want the value it
+		// points to, so we have to call Elem() to unwrap it
+		copyValue := reflect.New(originalValue.Type()).Elem()
+		translateRecursive(copyValue, originalValue)
+		copy.Set(copyValue)
+
+	// If it is a struct we translate each field
+	case reflect.Struct:
+		for i := 0; i < original.NumField(); i += 1 {
+			translateRecursive(copy.Field(i), original.Field(i))
+		}
+
+	// If it is a slice we create a new slice and translate each element
+	case reflect.Slice:
+		copy.Set(reflect.MakeSlice(original.Type(), original.Len(), original.Cap()))
+		for i := 0; i < original.Len(); i += 1 {
+			translateRecursive(copy.Index(i), original.Index(i))
+		}
+
+	// If it is a map we create a new map and translate each value
+	case reflect.Map:
+		copy.Set(reflect.MakeMap(original.Type()))
+		for _, key := range original.MapKeys() {
+			originalValue := original.MapIndex(key)
+			if originalValue.IsNil() {
+				continue
+			}
+			// New gives us a pointer, but again we want the value
+			copyValue := reflect.New(originalValue.Type()).Elem()
+
+			translateRecursive(copyValue, originalValue)
+			copy.SetMapIndex(key, copyValue)
+		}
+	default:
+		copy.Set(original)
+	}
 }
 
 // testSecret the method tries to log into the database with the secrets staged with AWSPENDING.

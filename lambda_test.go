@@ -302,17 +302,22 @@ var (
 	}
 )
 
-type mockDBClient struct{}
+type mockDBClient struct {
+	current, pending, previous any
+}
 
-func (m mockDBClient) Set(ctx context.Context, secretCurrent, secretPending, secretPrevious any) error {
+func (m *mockDBClient) Set(ctx context.Context, secretCurrent, secretPending, secretPrevious any) error {
+	m.current = secretCurrent
+	m.pending = secretPending
+	m.previous = secretPrevious
 	return nil
 }
 
-func (m mockDBClient) Test(ctx context.Context, secret any) error {
+func (m *mockDBClient) Test(ctx context.Context, secret any) error {
 	return nil
 }
 
-func (m mockDBClient) Create(ctx context.Context, secret any) error {
+func (m *mockDBClient) Create(ctx context.Context, secret any) error {
 	secret.(*mockObj).Password = placeholderSecretUserNewStr
 	return nil
 }
@@ -346,7 +351,7 @@ func Test_createSecret(t *testing.T) {
 							},
 						},
 					},
-					ServiceClient: mockDBClient{},
+					ServiceClient: &mockDBClient{},
 					SecretObj:     &mockObj{},
 					Debug:         true,
 				},
@@ -372,7 +377,7 @@ func Test_createSecret(t *testing.T) {
 							},
 						},
 					},
-					ServiceClient: mockDBClient{},
+					ServiceClient: &mockDBClient{},
 					SecretObj:     &mockObj{},
 					Debug:         true,
 				},
@@ -476,7 +481,7 @@ func Test_finishSecret(t *testing.T) {
 							},
 						},
 					},
-					ServiceClient: mockDBClient{},
+					ServiceClient: &mockDBClient{},
 					SecretObj:     &mockObj{},
 					Debug:         true,
 				},
@@ -501,7 +506,7 @@ func Test_finishSecret(t *testing.T) {
 							},
 						},
 					},
-					ServiceClient: mockDBClient{},
+					ServiceClient: &mockDBClient{},
 					SecretObj:     &mockObj{},
 					Debug:         true,
 				},
@@ -538,16 +543,21 @@ func Test_finishSecret(t *testing.T) {
 	}
 }
 
+type mapType map[string]string
+
 func Test_setSecret(t *testing.T) {
+	var mType mapType
 	type args struct {
 		ctx   context.Context
 		event secretsmanagerTriggerPayload
 		cfg   Config
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name                string
+		args                args
+		wantErr             bool
+		wantExpectedCurrent any
+		wantExpectedPending any
 	}{
 		{
 			name: "happy path",
@@ -563,19 +573,52 @@ func Test_setSecret(t *testing.T) {
 						secretAWSCurrent: placeholderSecretUserStr,
 						secretByID: map[string]map[string]string{
 							"foo": {
-								"AWSCURRENT": placeholderSecretUserStr,
+								"AWSCURRENT":  placeholderSecretUserStr,
+								"AWSPREVIOUS": placeholderSecretUserStr,
 							},
 							"bar": {
 								"AWSPENDING": placeholderSecretUserNewStr,
 							},
 						},
 					},
-					ServiceClient: mockDBClient{},
+					ServiceClient: &mockDBClient{},
 					SecretObj:     &mockObj{},
 					Debug:         true,
 				},
 			},
-			wantErr: false,
+			wantErr:             false,
+			wantExpectedCurrent: &placeholderSecretUser,
+			wantExpectedPending: &placeholderSecretUserNew,
+		},
+		{
+			name: "happy path: SecretObj-map",
+			args: args{
+				ctx: context.TODO(),
+				event: secretsmanagerTriggerPayload{
+					SecretARN: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+					Token:     "bar",
+					Step:      "setSecret",
+				},
+				cfg: Config{
+					SecretsmanagerClient: &mockSecretsmanagerClient{
+						secretAWSCurrent: `{"foo": "bar"}`,
+						secretByID: map[string]map[string]string{
+							"foo": {
+								"AWSCURRENT": `{"foo": "bar"}`,
+							},
+							"bar": {
+								"AWSPENDING": `{"foo": "baz"}`,
+							},
+						},
+					},
+					ServiceClient: &mockDBClient{},
+					SecretObj:     &mType,
+					Debug:         true,
+				},
+			},
+			wantErr:             false,
+			wantExpectedCurrent: &mapType{"foo": "bar"},
+			wantExpectedPending: &mapType{"foo": "baz"},
 		},
 		{
 			name: "happy path: AWSPREVIOUS is present",
@@ -599,7 +642,7 @@ func Test_setSecret(t *testing.T) {
 							},
 						},
 					},
-					ServiceClient: mockDBClient{},
+					ServiceClient: &mockDBClient{},
 					SecretObj:     &mockObj{},
 					Debug:         true,
 				},
@@ -607,7 +650,7 @@ func Test_setSecret(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "happy path: no AWSPREVIOUS version",
+			name: "happy path: no AWSCURRENT version",
 			args: args{
 				ctx: context.TODO(),
 				event: secretsmanagerTriggerPayload{
@@ -617,7 +660,7 @@ func Test_setSecret(t *testing.T) {
 				},
 				cfg: Config{
 					SecretsmanagerClient: &mockSecretsmanagerClient{},
-					ServiceClient:        mockDBClient{},
+					ServiceClient:        &mockDBClient{},
 					SecretObj:            &mockObj{},
 					Debug:                true,
 				},
@@ -642,7 +685,7 @@ func Test_setSecret(t *testing.T) {
 							},
 						},
 					},
-					ServiceClient: mockDBClient{},
+					ServiceClient: &mockDBClient{},
 					SecretObj:     &mockObj{},
 					Debug:         true,
 				},
@@ -655,6 +698,19 @@ func Test_setSecret(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				if err := setSecret(tt.args.ctx, tt.args.event, tt.args.cfg); (err != nil) != tt.wantErr {
 					t.Errorf("setSecret() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				if !tt.wantErr {
+					m := tt.args.cfg.ServiceClient.(*mockDBClient)
+					if tt.wantExpectedCurrent != nil {
+						if !reflect.DeepEqual(m.current, tt.wantExpectedCurrent) {
+							t.Errorf("setSecret() current secret is not propagated right")
+						}
+					}
+					if tt.wantExpectedPending != nil {
+						if !reflect.DeepEqual(m.pending, tt.wantExpectedPending) {
+							t.Errorf("setSecret() pending secret is not propagated right")
+						}
+					}
 				}
 			},
 		)
@@ -690,7 +746,7 @@ func Test_testSecret(t *testing.T) {
 							},
 						},
 					},
-					ServiceClient: mockDBClient{},
+					ServiceClient: &mockDBClient{},
 					SecretObj:     &mockObj{},
 					Debug:         true,
 				},
@@ -710,7 +766,7 @@ func Test_testSecret(t *testing.T) {
 					SecretsmanagerClient: &mockSecretsmanagerClient{
 						secretAWSCurrent: placeholderSecretUserStr,
 					},
-					ServiceClient: mockDBClient{},
+					ServiceClient: &mockDBClient{},
 					SecretObj:     &mockObj{},
 					Debug:         true,
 				},
@@ -735,7 +791,7 @@ func Test_testSecret(t *testing.T) {
 							},
 						},
 					},
-					ServiceClient: mockDBClient{},
+					ServiceClient: &mockDBClient{},
 					SecretObj:     &mockObj{},
 					Debug:         true,
 				},
@@ -1036,7 +1092,7 @@ func TestNewHandler(t *testing.T) {
 						},
 						rotationEnabled: aws.Bool(true),
 					},
-					ServiceClient: mockDBClient{},
+					ServiceClient: &mockDBClient{},
 					SecretObj:     &map[string]string{},
 					Debug:         true,
 				},
@@ -1066,7 +1122,7 @@ func TestNewHandler(t *testing.T) {
 						},
 						rotationEnabled: aws.Bool(true),
 					},
-					ServiceClient: mockDBClient{},
+					ServiceClient: &mockDBClient{},
 					SecretObj:     &map[string]string{},
 					Debug:         true,
 				},
@@ -1096,7 +1152,7 @@ func TestNewHandler(t *testing.T) {
 						},
 						rotationEnabled: aws.Bool(true),
 					},
-					ServiceClient: mockDBClient{},
+					ServiceClient: &mockDBClient{},
 					SecretObj:     &map[string]string{},
 					Debug:         true,
 				},
@@ -1126,7 +1182,7 @@ func TestNewHandler(t *testing.T) {
 						},
 						rotationEnabled: aws.Bool(true),
 					},
-					ServiceClient: mockDBClient{},
+					ServiceClient: &mockDBClient{},
 					SecretObj:     &map[string]string{},
 					Debug:         true,
 				},
