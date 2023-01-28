@@ -68,7 +68,7 @@ func main() {
 		secretRotation.Config{
 			SecretsmanagerClient: clientSecretsManager,
 			ServiceClient:        client,
-			SecretObj:            s,
+			SecretObj:            &s,
 			Debug:                secretRotation.StrToBool(os.Getenv("DEBUG")),
 		},
 	)

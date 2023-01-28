@@ -59,8 +59,8 @@ func (c dbClient) Set(ctx context.Context, secretCurrent, secretPending, secretP
 		return errors.New("pending secret error: " + err.Error())
 	}
 
-	current := secretCurrent.(SecretUser)
-	pending := secretPending.(SecretUser)
+	current := *(secretCurrent.(*SecretUser))
+	pending := *(secretPending.(*SecretUser))
 
 	if current[c.attributeKey] == pending[c.attributeKey] {
 		return errors.New(`API key "` + c.attributeKey + `" shall be modified`)
@@ -84,14 +84,14 @@ func (c dbClient) Set(ctx context.Context, secretCurrent, secretPending, secretP
 
 func (c dbClient) Test(ctx context.Context, secret any) error {
 	ctx = c.wrapContext(ctx)
-	s, ok := secret.(SecretUser)
+	s, ok := secret.(*SecretUser)
 	if !ok {
 		return errors.New("wrong secret type")
 	}
-	if _, ok := s[c.attributeKey]; !ok {
+	if _, ok := (*s)[c.attributeKey]; !ok {
 		return errors.New(`wrong secret type: "` + c.attributeKey + `" field not found`)
 	}
-	if _, ok := s[c.attributeSecret]; !ok {
+	if _, ok := (*s)[c.attributeSecret]; !ok {
 		return errors.New(`wrong secret type: "` + c.attributeSecret + `" field not found`)
 	}
 	return nil
@@ -100,11 +100,12 @@ func (c dbClient) Test(ctx context.Context, secret any) error {
 func (c dbClient) Create(ctx context.Context, secret any) error {
 	ctx = c.wrapContext(ctx)
 
-	s, ok := secret.(SecretUser)
+	sT, ok := secret.(*SecretUser)
 	if !ok {
 		return errors.New("wrong secret type")
 	}
 
+	s := *sT
 	id, ok := s[c.attributeKey]
 	if !ok {
 		return errors.New(`wrong secret type: "` + c.attributeKey + `" field not found`)
@@ -129,7 +130,7 @@ func (c dbClient) Create(ctx context.Context, secret any) error {
 	sp, _ := createdKey.GetSpecOk()
 	s[c.attributeSecret] = sp.GetSecret()
 
-	secret = s
+	secret = &s
 	return nil
 }
 

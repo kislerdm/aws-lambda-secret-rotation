@@ -150,7 +150,7 @@ func Test_dbClient_Create(t *testing.T) {
 			},
 			args: args{
 				ctx:    context.TODO(),
-				secret: SecretUser{"user": "bar", "password": mockSecret},
+				secret: &SecretUser{"user": "bar", "password": mockSecret},
 			},
 			wantErr: false,
 		},
@@ -176,7 +176,7 @@ func Test_dbClient_Create(t *testing.T) {
 			},
 			args: args{
 				ctx:    context.TODO(),
-				secret: SecretUser{"user": "bar", "password": mockSecret},
+				secret: &SecretUser{"user": "bar", "password": mockSecret},
 			},
 			wantErr: true,
 		},
@@ -202,7 +202,7 @@ func Test_dbClient_Create(t *testing.T) {
 			},
 			args: args{
 				ctx:    context.TODO(),
-				secret: SecretUser{"user": "bar", "password": mockSecret},
+				secret: &SecretUser{"user": "bar", "password": mockSecret},
 			},
 			wantErr: true,
 		},
@@ -228,7 +228,7 @@ func Test_dbClient_Create(t *testing.T) {
 			},
 			args: args{
 				ctx:    context.TODO(),
-				secret: SecretUser{"user": "bar", "password": mockSecret},
+				secret: &SecretUser{"user": "bar", "password": mockSecret},
 			},
 			wantErr: true,
 		},
@@ -254,7 +254,7 @@ func Test_dbClient_Create(t *testing.T) {
 			},
 			args: args{
 				ctx:    context.TODO(),
-				secret: SecretUser{"user": "bar", "password": mockSecret},
+				secret: &SecretUser{"user": "bar", "password": mockSecret},
 			},
 			wantErr: true,
 		},
@@ -280,7 +280,7 @@ func Test_dbClient_Create(t *testing.T) {
 			},
 			args: args{
 				ctx:    context.TODO(),
-				secret: SecretUser{"foo": "bar"},
+				secret: &SecretUser{"foo": "bar"},
 			},
 			wantErr: true,
 		},
@@ -297,7 +297,7 @@ func Test_dbClient_Create(t *testing.T) {
 			},
 			args: args{
 				ctx:    context.TODO(),
-				secret: SecretUser{"user": "bar"},
+				secret: &SecretUser{"user": "bar"},
 			},
 			wantErr: true,
 		},
@@ -316,7 +316,7 @@ func Test_dbClient_Create(t *testing.T) {
 			},
 			args: args{
 				ctx:    context.TODO(),
-				secret: SecretUser{"user": "bar"},
+				secret: &SecretUser{"user": "bar"},
 			},
 			wantErr: true,
 		},
@@ -335,7 +335,7 @@ func Test_dbClient_Create(t *testing.T) {
 			},
 			args: args{
 				ctx:    context.TODO(),
-				secret: SecretUser{"user": "bar"},
+				secret: &SecretUser{"user": "bar"},
 			},
 			wantErr: true,
 		},
@@ -353,7 +353,7 @@ func Test_dbClient_Create(t *testing.T) {
 				}
 
 				if !tt.wantErr {
-					s := tt.args.secret.(SecretUser)
+					s := *(tt.args.secret.(*SecretUser))
 					if mockIDNew != s["user"] || mockSecretNew != s["password"] {
 						t.Errorf("Create() newly generated secret was not stored correctly")
 					}
@@ -393,8 +393,8 @@ func Test_dbClient_Set(t *testing.T) {
 			},
 			args: args{
 				ctx:           context.TODO(),
-				secretCurrent: SecretUser{"user": "foo", "password": "bar", "host": "localhost:9092"},
-				secretPending: SecretUser{"user": "foo-new", "password": "bar-new", "host": "localhost:9092"},
+				secretCurrent: &SecretUser{"user": "foo", "password": "bar", "host": "localhost:9092"},
+				secretPending: &SecretUser{"user": "foo-new", "password": "bar-new", "host": "localhost:9092"},
 			},
 			wantErr: false,
 		},
@@ -407,7 +407,7 @@ func Test_dbClient_Set(t *testing.T) {
 			args: args{
 				ctx:           context.TODO(),
 				secretCurrent: "foo",
-				secretPending: SecretUser{"user": "foo-new", "password": "bar-new", "host": "localhost:9092"},
+				secretPending: &SecretUser{"user": "foo-new", "password": "bar-new", "host": "localhost:9092"},
 			},
 			wantErr: true,
 		},
@@ -419,7 +419,7 @@ func Test_dbClient_Set(t *testing.T) {
 			},
 			args: args{
 				ctx:           context.TODO(),
-				secretCurrent: SecretUser{"user": "foo", "password": "bar", "host": "localhost:9092"},
+				secretCurrent: &SecretUser{"user": "foo", "password": "bar", "host": "localhost:9092"},
 				secretPending: "bar",
 			},
 			wantErr: true,
@@ -432,8 +432,8 @@ func Test_dbClient_Set(t *testing.T) {
 			},
 			args: args{
 				ctx:           context.TODO(),
-				secretCurrent: SecretUser{"user": "foo", "password": "bar", "host": "localhost:9092"},
-				secretPending: SecretUser{"user": "foo", "password": "bar-new", "host": "localhost:9092"},
+				secretCurrent: &SecretUser{"user": "foo", "password": "bar", "host": "localhost:9092"},
+				secretPending: &SecretUser{"user": "foo", "password": "bar-new", "host": "localhost:9092"},
 			},
 			wantErr: true,
 		},
@@ -445,8 +445,8 @@ func Test_dbClient_Set(t *testing.T) {
 			},
 			args: args{
 				ctx:           context.TODO(),
-				secretCurrent: SecretUser{"user": "foo", "password": "bar", "host": "localhost:9092"},
-				secretPending: SecretUser{"user": "foo-new", "password": "bar", "host": "localhost:9092"},
+				secretCurrent: &SecretUser{"user": "foo", "password": "bar", "host": "localhost:9092"},
+				secretPending: &SecretUser{"user": "foo-new", "password": "bar", "host": "localhost:9092"},
 			},
 			wantErr: true,
 		},
@@ -458,10 +458,10 @@ func Test_dbClient_Set(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				secretCurrent: SecretUser{
+				secretCurrent: &SecretUser{
 					"user": "foo", "password": "bar", "host": "localhost:29092", "client_id": "quxx",
 				},
-				secretPending: SecretUser{"user": "foo-new", "password": "bar-new", "host": "localhost:9092"},
+				secretPending: &SecretUser{"user": "foo-new", "password": "bar-new", "host": "localhost:9092"},
 			},
 			wantErr: true,
 		},
@@ -484,7 +484,7 @@ func Test_dbClient_Set(t *testing.T) {
 	}
 }
 
-func Test(t *testing.T) {
+func Test_dbClient_Test(t *testing.T) {
 	type fields struct {
 		KeyUser     string
 		KeyPassword string
@@ -508,7 +508,7 @@ func Test(t *testing.T) {
 			},
 			args: args{
 				ctx:    context.TODO(),
-				secret: SecretUser{"user": "foo", "password": "bar", "host": "localhost:9092", "attr01": "baz"},
+				secret: &SecretUser{"user": "foo", "password": "bar", "host": "localhost:9092", "attr01": "baz"},
 			},
 			wantErr: false,
 		},
@@ -532,7 +532,7 @@ func Test(t *testing.T) {
 			},
 			args: args{
 				ctx:    context.TODO(),
-				secret: SecretUser{"password": "bar", "host": "localhost:9092", "attr01": "baz"},
+				secret: &SecretUser{"password": "bar", "host": "localhost:9092", "attr01": "baz"},
 			},
 			wantErr: true,
 		},
@@ -544,7 +544,7 @@ func Test(t *testing.T) {
 			},
 			args: args{
 				ctx:    context.TODO(),
-				secret: SecretUser{"user": "foo", "host": "localhost:9092", "attr01": "baz"},
+				secret: &SecretUser{"user": "foo", "host": "localhost:9092", "attr01": "baz"},
 			},
 			wantErr: true,
 		},
