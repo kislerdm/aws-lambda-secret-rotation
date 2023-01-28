@@ -2,10 +2,8 @@ name: "Tests:Main"
 
 on:
   push:
-    paths:
-      - "*.go"
-      - "go.mod"
-      - "go.sum"
+    branches:
+      - master
   pull_request:
     branches:
       - master

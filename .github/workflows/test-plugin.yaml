@@ -2,13 +2,8 @@ name: "Tests:Plugin"
 
 on:
   push:
-    paths:
-      - "plugin/**/*.go"
-      - "plugin/**/go.mod"
-      - "plugin/**/go.sum"
-      - "*.go"
-      - "go.mod"
-      - "go.sum"
+    branches:
+      - master
   pull_request:
     branches:
       - master
