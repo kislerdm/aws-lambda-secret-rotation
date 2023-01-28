@@ -10,23 +10,47 @@ import (
 )
 
 // NewServiceClient initiates the `ServiceClient` to rotate credentials for Confluent Kafka user.
-func NewServiceClient(client *sdk.APIClient, attributeKey, attributeSecret string) lambda.ServiceClient {
+func NewServiceClient(
+	client *sdk.APIClient, apiKey, apiSecret, attributeKey, attributeSecret string,
+) (lambda.ServiceClient, error) {
+	if apiKey == "" || apiSecret == "" {
+		return nil, errors.New("confluent API key-secret pair must be provided")
+	}
 	if attributeKey == "" {
 		attributeKey = "user"
 	}
 	if attributeSecret == "" {
 		attributeSecret = "password"
 	}
-	return &dbClient{c: client, attributeKey: attributeKey, attributeSecret: attributeSecret}
+	return &dbClient{
+		c:               client,
+		attributeKey:    attributeKey,
+		attributeSecret: attributeSecret,
+		apiKey:          apiKey,
+		apiSecret:       apiSecret,
+	}, nil
 }
 
 type dbClient struct {
+	apiKey          string
+	apiSecret       string
 	attributeKey    string
 	attributeSecret string
 	c               *sdk.APIClient
 }
 
+func (c dbClient) wrapContext(ctx context.Context) context.Context {
+	return context.WithValue(
+		ctx, sdk.ContextBasicAuth, sdk.BasicAuth{
+			UserName: c.apiKey,
+			Password: c.apiSecret,
+		},
+	)
+}
+
 func (c dbClient) Set(ctx context.Context, secretCurrent, secretPending, secretPrevious any) error {
+	ctx = c.wrapContext(ctx)
+
 	if err := c.Test(ctx, secretCurrent); err != nil {
 		return errors.New("current secret error: " + err.Error())
 	}
@@ -59,6 +83,7 @@ func (c dbClient) Set(ctx context.Context, secretCurrent, secretPending, secretP
 }
 
 func (c dbClient) Test(ctx context.Context, secret any) error {
+	ctx = c.wrapContext(ctx)
 	s, ok := secret.(SecretUser)
 	if !ok {
 		return errors.New("wrong secret type")
@@ -73,6 +98,8 @@ func (c dbClient) Test(ctx context.Context, secret any) error {
 }
 
 func (c dbClient) Create(ctx context.Context, secret any) error {
+	ctx = c.wrapContext(ctx)
+
 	s, ok := secret.(SecretUser)
 	if !ok {
 		return errors.New("wrong secret type")

@@ -972,7 +972,7 @@ func TestNewHandler(t *testing.T) {
 			args: args{
 				cfg: Config{
 					SecretsmanagerClient: &mockSecretsmanagerClient{
-						secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+						secretAWSCurrent: placeholderSecretUserStr,
 						secretByID: map[string]map[string]string{
 							"foo": {
 								"AWSCURRENT": placeholderSecretUserStr,
@@ -1000,7 +1000,7 @@ func TestNewHandler(t *testing.T) {
 			args: args{
 				cfg: Config{
 					SecretsmanagerClient: &mockSecretsmanagerClient{
-						secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+						secretAWSCurrent: placeholderSecretUserStr,
 						secretByID: map[string]map[string]string{
 							"foo": {
 								"AWSCURRENT": placeholderSecretUserStr,
@@ -1027,7 +1027,7 @@ func TestNewHandler(t *testing.T) {
 			args: args{
 				cfg: Config{
 					SecretsmanagerClient: &mockSecretsmanagerClient{
-						secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+						secretAWSCurrent: placeholderSecretUserStr,
 						secretByID: map[string]map[string]string{
 							"foo": {
 								"AWSCURRENT": placeholderSecretUserStr,
@@ -1057,7 +1057,7 @@ func TestNewHandler(t *testing.T) {
 			args: args{
 				cfg: Config{
 					SecretsmanagerClient: &mockSecretsmanagerClient{
-						secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+						secretAWSCurrent: placeholderSecretUserStr,
 						secretByID: map[string]map[string]string{
 							"foo": {
 								"AWSCURRENT": placeholderSecretUserStr,
@@ -1087,7 +1087,7 @@ func TestNewHandler(t *testing.T) {
 			args: args{
 				cfg: Config{
 					SecretsmanagerClient: &mockSecretsmanagerClient{
-						secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+						secretAWSCurrent: placeholderSecretUserStr,
 						secretByID: map[string]map[string]string{
 							"foo": {
 								"AWSCURRENT": placeholderSecretUserStr,
@@ -1117,7 +1117,7 @@ func TestNewHandler(t *testing.T) {
 			args: args{
 				cfg: Config{
 					SecretsmanagerClient: &mockSecretsmanagerClient{
-						secretAWSCurrent: "arn:aws:secretsmanager:us-east-1:000000000000:secret:foo/bar-5BKPC8",
+						secretAWSCurrent: placeholderSecretUserStr,
 						secretByID: map[string]map[string]string{
 							"foo": {
 								"AWSCURRENT": placeholderSecretUserStr,

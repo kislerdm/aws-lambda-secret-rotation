@@ -224,10 +224,12 @@ func setSecret(ctx context.Context, event secretsmanagerTriggerPayload, cfg Conf
 	secretPrevious, err := getSecretValue(ctx, cfg.SecretsmanagerClient, event.SecretARN, "AWSPREVIOUS", "")
 	switch err.(type) {
 	case *types.ResourceNotFoundException, nil:
+		secretPrevious = nil
 	case *smithy.OperationError:
 		if e, ok := err.(*smithy.OperationError).Unwrap().(*smithyHttp.ResponseError); ok {
 			switch e.HTTPStatusCode() {
 			case http.StatusBadRequest, http.StatusNotFound:
+				secretPrevious = nil
 			default:
 				return err
 			}
@@ -266,7 +268,25 @@ func setSecret(ctx context.Context, event secretsmanagerTriggerPayload, cfg Conf
 	if cfg.Debug {
 		log.Println("[DEBUG] call cfg.ServiceClient.Set()")
 	}
-	return cfg.ServiceClient.Set(ctx, secretCurrent, secretPending, secretPrevious)
+
+	current := cfg.SecretObj
+	if err := ExtractSecretObject(secretCurrent, current); err != nil {
+		return err
+	}
+
+	pending := cfg.SecretObj
+	if err := ExtractSecretObject(secretPending, pending); err != nil {
+		return err
+	}
+
+	previous := cfg.SecretObj
+	if secretPrevious != nil {
+		if err := ExtractSecretObject(secretPending, previous); err != nil {
+			return err
+		}
+	}
+
+	return cfg.ServiceClient.Set(ctx, current, pending, previous)
 }
 
 // testSecret the method tries to log into the database with the secrets staged with AWSPENDING.

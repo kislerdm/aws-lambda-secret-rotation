@@ -568,13 +568,16 @@ func Test(t *testing.T) {
 func TestNewServiceClient(t *testing.T) {
 	type args struct {
 		client          *sdk.APIClient
+		apiKey          string
+		apiSecret       string
 		attributeKey    string
 		attributeSecret string
 	}
 	tests := []struct {
-		name string
-		args args
-		want lambda.ServiceClient
+		name    string
+		args    args
+		want    lambda.ServiceClient
+		wantErr bool
 	}{
 		{
 			name: "happy path",
@@ -582,16 +585,21 @@ func TestNewServiceClient(t *testing.T) {
 				client: &sdk.APIClient{
 					APIKeysIamV2Api: &mockAPIKeysIamV2Api{},
 				},
+				apiKey:          "key",
+				apiSecret:       "secret",
 				attributeKey:    "foo",
 				attributeSecret: "bar",
 			},
 			want: &dbClient{
+				apiKey:          "key",
+				apiSecret:       "secret",
 				attributeKey:    "foo",
 				attributeSecret: "bar",
 				c: &sdk.APIClient{
 					APIKeysIamV2Api: &mockAPIKeysIamV2Api{},
 				},
 			},
+			wantErr: false,
 		},
 		{
 			name: "happy path: default key",
@@ -599,15 +607,20 @@ func TestNewServiceClient(t *testing.T) {
 				client: &sdk.APIClient{
 					APIKeysIamV2Api: &mockAPIKeysIamV2Api{},
 				},
+				apiKey:          "key",
+				apiSecret:       "secret",
 				attributeSecret: "bar",
 			},
 			want: &dbClient{
 				attributeKey:    "user",
 				attributeSecret: "bar",
+				apiKey:          "key",
+				apiSecret:       "secret",
 				c: &sdk.APIClient{
 					APIKeysIamV2Api: &mockAPIKeysIamV2Api{},
 				},
 			},
+			wantErr: false,
 		},
 		{
 			name: "happy path: default secret",
@@ -615,23 +628,54 @@ func TestNewServiceClient(t *testing.T) {
 				client: &sdk.APIClient{
 					APIKeysIamV2Api: &mockAPIKeysIamV2Api{},
 				},
+				apiKey:       "key",
+				apiSecret:    "secret",
 				attributeKey: "foo",
 			},
 			want: &dbClient{
+				apiKey:          "key",
+				apiSecret:       "secret",
 				attributeKey:    "foo",
 				attributeSecret: "password",
 				c: &sdk.APIClient{
 					APIKeysIamV2Api: &mockAPIKeysIamV2Api{},
 				},
 			},
+			wantErr: false,
+		},
+		{
+			name: "unhappy path: no API key provided",
+			args: args{
+				client: &sdk.APIClient{
+					APIKeysIamV2Api: &mockAPIKeysIamV2Api{},
+				},
+				apiSecret: "secret",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: no API secret provided",
+			args: args{
+				client: &sdk.APIClient{
+					APIKeysIamV2Api: &mockAPIKeysIamV2Api{},
+				},
+				apiKey: "key",
+			},
+			want:    nil,
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				if got := NewServiceClient(
-					tt.args.client, tt.args.attributeKey, tt.args.attributeSecret,
-				); !reflect.DeepEqual(got, tt.want) {
+				got, err := NewServiceClient(
+					tt.args.client, tt.args.apiKey, tt.args.apiSecret, tt.args.attributeKey, tt.args.attributeSecret,
+				)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("NewServiceClient() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				if !reflect.DeepEqual(got, tt.want) {
 					t.Errorf("NewServiceClient() = %v, want %v", got, tt.want)
 				}
 			},
