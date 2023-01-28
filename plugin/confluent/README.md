@@ -2,9 +2,6 @@
 
 [![logo](https://login-static.confluent.io/web/3.799.1/favicon.ico)](https://www.confluent.io/)
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/kislerdm/aws-lambda-secret-rotation/plugin/confluent)](https://goreportcard.com/report/github.com/kislerdm/aws-lambda-secret-rotation/plugin/confluent)
-[![codecov](https://codecov.io/gh/kislerdm/aws-lambda-secret-rotation/branch/master/graph/badge.svg?flag=confluent)](https://app.codecov.io/gh/kislerdm/aws-lambda-secret-rotation/flags)
-
 ## Requirements
 
 Secrets (see the [types definition](models.go)):
