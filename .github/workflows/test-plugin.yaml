@@ -41,12 +41,11 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: 1.19
-      - name: Change dir
-        run: cd plugin/${{ matrix.plugin }}
-      - name: Mod tidy
-        run: go mod tidy
       - name: Test
-        run: go test -race -coverprofile=coverage-${{ matrix.plugin }}.txt -covermode=atomic
+        run: |
+          cd plugin/${{ matrix.plugin }}
+          go mod tidy
+          go test -race -coverprofile=coverage-${{ matrix.plugin }}.txt -covermode=atomic
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
