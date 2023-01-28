@@ -44,6 +44,9 @@ provider "confluent" {
 }
 
 locals {
+  plugin      = "confluent"
+  lambda_name = "${local.plugin}-key-rotation"
+
   sa = { "foo-bar" : "" }
 }
 
@@ -79,7 +82,7 @@ resource "confluent_api_key" "this" {
 }
 
 resource "aws_secretsmanager_secret" "admin" {
-  name                    = "confluent/admin"
+  name                    = "${local.plugin}/SecretAdmin"
   description             = "Confluent admin API key"
   recovery_window_in_days = 0
 
@@ -100,7 +103,7 @@ resource "aws_secretsmanager_secret_version" "admin" {
 
 resource "aws_secretsmanager_secret" "this" {
   for_each                = local.sa
-  name                    = "confluent/${each.key}"
+  name                    = "${local.plugin}/SecretUser/${each.key}"
   description             = "Confluent credentials for SA ${each.key}"
   recovery_window_in_days = 0
 
@@ -132,14 +135,8 @@ resource "aws_secretsmanager_secret_rotation" "this" {
 
 #### Lambda
 
-locals {
-  plugin      = "confluent"
-  lambda_name = "${local.plugin}-key-rotation"
-}
-
-
 resource "aws_iam_policy" "this" {
-  name = "LambdaSecretRotation@confluent"
+  name = "LambdaSecretRotation@${local.plugin}"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = concat([
@@ -174,7 +171,7 @@ resource "aws_iam_policy" "this" {
 }
 
 resource "aws_iam_role" "this" {
-  name = "secret-rotation@neon-user"
+  name = "secret-rotation@${local.plugin}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -217,7 +214,7 @@ resource "null_resource" "this" {
 }
 
 data "local_file" "this" {
-  filename   = "${path.module}/../../../bin/confluent/aws-lambda-secret-rotation_confluent_local.zip"
+  filename   = "${path.module}/../../../bin/${local.plugin}/aws-lambda-secret-rotation_${local.plugin}_local.zip"
   depends_on = [null_resource.this]
 }
 

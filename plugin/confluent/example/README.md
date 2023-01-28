@@ -6,6 +6,8 @@
 - [Confluent Cloud](https://www.confluent.io/) account with a
   Cloud [API key](https://docs.confluent.io/cloud/current/api.html)
 - [terraform](https://www.terraform.io/) ~> 1.3.3
+- [go](https://go.dev) ~> 1.19
+- [gnuMake](https://www.gnu.org/software/make/)
 
 ## How to run
 
@@ -77,7 +79,7 @@ rm -rf terraform.tfstate* .terraform .terraform.lock.hcl
 
 ## References
 
-- [AWS Access Key]((https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html))
+- [AWS Access Key](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html)
 - [Confluent API](https://docs.confluent.io/cloud/current/api.html)
 - [Confluent Environments](https://docs.confluent.io/cloud/current/access-management/hierarchy/cloud-environments.html)
 - [Kafka bootstrapServer](https://kafka.apache.org/documentation/#producerconfigs_bootstrap.servers)
