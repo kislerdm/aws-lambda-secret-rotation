@@ -54,17 +54,22 @@ func main() {
 	cfg.Servers[0].URL = "https://api.confluent.cloud"
 	cfg.UserAgent = userAgent()
 
-	client := sdk.NewAPIClient(cfg)
+	client, err := confluentClient.NewServiceClient(
+		sdk.NewAPIClient(cfg),
+		adminSecret.APIKey, adminSecret.APISecret,
+		os.Getenv("ATTRIBUTE_KEY"), os.Getenv("ATTRIBUTE_SECRET"),
+	)
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	var s confluentClient.SecretUser
 	handler, err := secretRotation.NewHandler(
 		secretRotation.Config{
 			SecretsmanagerClient: clientSecretsManager,
-			ServiceClient: confluentClient.NewServiceClient(
-				client, os.Getenv("ATTRIBUTE_KEY"), os.Getenv("ATTRIBUTE_SECRET"),
-			),
-			SecretObj: &s,
-			Debug:     secretRotation.StrToBool(os.Getenv("DEBUG")),
+			ServiceClient:        client,
+			SecretObj:            s,
+			Debug:                secretRotation.StrToBool(os.Getenv("DEBUG")),
 		},
 	)
 	if err != nil {
