@@ -21,6 +21,7 @@ type mockAPIKeysIamV2Api struct {
 	generateCorruptSpec   bool
 	generateCorruptSecret bool
 	createKeyExecuteError bool
+	deleteKeyExecuteError bool
 	keys                  map[string]sdk.IamV2ApiKey
 }
 
@@ -60,11 +61,17 @@ func (m *mockAPIKeysIamV2Api) CreateIamV2ApiKeyExecute(r sdk.ApiCreateIamV2ApiKe
 }
 
 func (m *mockAPIKeysIamV2Api) DeleteIamV2ApiKey(ctx context.Context, id string) sdk.ApiDeleteIamV2ApiKeyRequest {
-	panic("not implemented")
+	delete(m.keys, id)
+	return sdk.ApiDeleteIamV2ApiKeyRequest{
+		ApiService: m,
+	}
 }
 
 func (m *mockAPIKeysIamV2Api) DeleteIamV2ApiKeyExecute(r sdk.ApiDeleteIamV2ApiKeyRequest) (*http.Response, error) {
-	panic("not implemented")
+	if m.deleteKeyExecuteError {
+		return nil, errors.New("foo-bar error")
+	}
+	return nil, nil
 }
 
 func (m *mockAPIKeysIamV2Api) GetIamV2ApiKey(ctx context.Context, id string) sdk.ApiGetIamV2ApiKeyRequest {
@@ -390,6 +397,13 @@ func Test_dbClient_Set(t *testing.T) {
 			fields: fields{
 				KeyUser:     "user",
 				KeyPassword: "password",
+				c: &sdk.APIClient{
+					APIKeysIamV2Api: &mockAPIKeysIamV2Api{
+						keys: map[string]sdk.IamV2ApiKey{
+							"foo": {},
+						},
+					},
+				},
 			},
 			args: args{
 				ctx:           context.TODO(),
@@ -465,6 +479,26 @@ func Test_dbClient_Set(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "unhappy path: deletion error",
+			fields: fields{
+				KeyUser:     "user",
+				KeyPassword: "password",
+				c: &sdk.APIClient{
+					APIKeysIamV2Api: &mockAPIKeysIamV2Api{
+						deleteKeyExecuteError: true,
+					},
+				},
+			},
+			args: args{
+				ctx: context.TODO(),
+				secretCurrent: &SecretUser{
+					"user": "foo", "password": "bar", "host": "localhost:29092", "client_id": "quxx",
+				},
+				secretPending: &SecretUser{"user": "foo-new", "password": "bar-new", "host": "localhost:9092"},
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(
@@ -474,10 +508,20 @@ func Test_dbClient_Set(t *testing.T) {
 					attributeSecret: tt.fields.KeyPassword,
 					c:               tt.fields.c,
 				}
-				if err := c.Set(
+
+				err := c.Set(
 					tt.args.ctx, tt.args.secretCurrent, tt.args.secretPending, tt.args.secretPrevious,
-				); (err != nil) != tt.wantErr {
+				)
+				if (err != nil) != tt.wantErr {
 					t.Errorf("Set() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				if !tt.wantErr {
+					id := (*tt.args.secretCurrent.(*SecretUser))[tt.fields.KeyUser]
+					if _, _, e := c.c.APIKeysIamV2Api.GetIamV2ApiKey(
+						context.TODO(), id,
+					).Execute(); e == nil || e.Error() != "not found" {
+						t.Errorf("Set() did not delete current key as expected")
+					}
 				}
 			},
 		)

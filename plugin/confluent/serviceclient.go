@@ -70,16 +70,40 @@ func (c dbClient) Set(ctx context.Context, secretCurrent, secretPending, secretP
 		return errors.New(`API secret "` + c.attributeSecret + `" shall be modified`)
 	}
 
+	if err := c.additionalAttributesMatchError(current, pending); err != nil {
+		return err
+	}
+
+	return deleteKey(ctx, c.c.APIKeysIamV2Api, current[c.attributeKey])
+}
+
+func (c dbClient) additionalAttributesMatchError(current SecretUser, pending SecretUser) error {
+	currentID := current[c.attributeKey]
+	currentSecret := current[c.attributeSecret]
+	pendingID := pending[c.attributeKey]
+	pendingSecret := pending[c.attributeSecret]
+
 	current[c.attributeKey] = ""
 	current[c.attributeSecret] = ""
 	pending[c.attributeKey] = ""
 	pending[c.attributeSecret] = ""
 
-	if !reflect.DeepEqual(current, pending) {
+	additionalAttrMatch := reflect.DeepEqual(current, pending)
+
+	current[c.attributeKey] = currentID
+	current[c.attributeSecret] = currentSecret
+	pending[c.attributeKey] = pendingID
+	pending[c.attributeSecret] = pendingSecret
+
+	if !additionalAttrMatch {
 		return errors.New("additional attributes of the current and pending secrets shall match")
 	}
-
 	return nil
+}
+
+func deleteKey(ctx context.Context, c sdk.APIKeysIamV2Api, id string) error {
+	_, err := c.DeleteIamV2ApiKey(ctx, id).Execute()
+	return err
 }
 
 func (c dbClient) Test(ctx context.Context, secret any) error {
