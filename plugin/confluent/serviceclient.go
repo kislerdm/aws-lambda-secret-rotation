@@ -142,7 +142,6 @@ func (c dbClient) Create(ctx context.Context, secret any) error {
 
 	spec := currentKey.GetSpec()
 	spec.SetSecret("")
-	spec.SetDisplayName(spec.GetDisplayName() + "-rotate")
 
 	createdKey, err := createKey(ctx, c.c.APIKeysIamV2Api, &spec)
 	if err != nil {
