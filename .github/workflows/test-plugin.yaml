@@ -6,6 +6,9 @@ on:
       - "plugin/**/*.go"
       - "plugin/**/go.mod"
       - "plugin/**/go.sum"
+      - "*.go"
+      - "go.mod"
+      - "go.sum"
   pull_request:
     branches:
       - master
